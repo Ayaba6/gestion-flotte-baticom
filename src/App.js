@@ -1,25 +1,77 @@
-import logo from './logo.svg';
-import './App.css';
+import { Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login.js";
+import AdminDashboard from "./pages/AdminDashboard.js";
+import AdminUsers from "./components/AdminUsers.js";
+import AdminFlotte from "./components/AdminFlotte.js";
+import SuperviseurDashboard from "./pages/SuperviseurDashboard.js";
+import ChauffeurDashboard from "./pages/ChauffeurDashboard.js";
+import PannesDeclarees from "./components/PannesDeclarees.js";
+import ProtectedRoute from "./components/ProtectedRoute.js";
+import "leaflet/dist/leaflet.css";
 
-function App() {
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      {/* Admin */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin-users"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminUsers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin-flotte"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminFlotte />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Superviseur */}
+      <Route
+        path="/superviseur"
+        element={
+          <ProtectedRoute requiredRole="superviseur">
+            <SuperviseurDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Chauffeur */}
+      <Route
+        path="/chauffeur"
+        element={
+          <ProtectedRoute requiredRole="chauffeur">
+            <ChauffeurDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pannes déclarées */}
+      <Route
+        path="/pannesdeclarees"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <PannesDeclarees />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Redirection par défaut */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }
-
-export default App;

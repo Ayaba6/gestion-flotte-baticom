@@ -2,14 +2,32 @@
   "name": "flotte-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
+    "@chakra-ui/react": "^3.27.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@supabase/supabase-js": "^2.57.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.12.2",
+    "class-variance-authority": "^0.7.1",
+    "framer-motion": "^12.23.13",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-icons": "^5.5.0",
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.9.1",
     "react-scripts": "5.0.1",
+    "tailwind-variants": "^3.1.1",
+    "tailwindcss-animate": "^1.0.7",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -35,5 +53,15 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  },
+  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "main": "createAdmin.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
