@@ -48,6 +48,7 @@ export default function SuperviseurDashboard() {
   const [chauffeurs, setChauffeurs] = useState([]);
   const [missions, setMissions] = useState([]);
   const [pannes, setPannes] = useState([]);
+  const [alertes, setAlertes] = useState([]);
   const [newPannesCount, setNewPannesCount] = useState(0);
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,6 +86,12 @@ export default function SuperviseurDashboard() {
         .select("*, chauffeur:users(id,email)")
         .order("created_at", { ascending: false });
       setPannes(pannesData || []);
+
+      const { data: alertesData } = await supabase
+        .from("alertes_expirations")
+        .select("*")
+        .order("date_expiration", { ascending: true });
+      setAlertes(alertesData || []);
 
       setLoading(false);
     };
@@ -127,6 +134,9 @@ export default function SuperviseurDashboard() {
     if (camion.statut === "en_mission") return orangeIcon;
     return greenIcon;
   };
+
+  // Calcul du nombre d'alertes critiques
+  const criticalAlertesCount = alertes.filter(a => a.criticite === "critique").length;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -245,7 +255,10 @@ export default function SuperviseurDashboard() {
                   <h3 className="text-xl font-bold">{camions.length}</h3>
                   <p className="opacity-80 text-sm">Camions actifs</p>
                   <div className="w-full bg-blue-300 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: `${Math.min(camions.length / 50 * 100, 100)}%` }} />
+                    <div
+                      className="bg-white h-1 rounded"
+                      style={{ width: `${Math.min(camions.length / 50 * 100, 100)}%` }}
+                    ></div>
                   </div>
                 </div>
 
@@ -255,7 +268,10 @@ export default function SuperviseurDashboard() {
                   <h3 className="text-xl font-bold">{chauffeurs.length}</h3>
                   <p className="opacity-80 text-sm">Chauffeurs</p>
                   <div className="w-full bg-green-300 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: `${Math.min(chauffeurs.length / 50 * 100, 100)}%` }} />
+                    <div
+                      className="bg-white h-1 rounded"
+                      style={{ width: `${Math.min(chauffeurs.length / 50 * 100, 100)}%` }}
+                    ></div>
                   </div>
                 </div>
 
@@ -268,7 +284,10 @@ export default function SuperviseurDashboard() {
                   <h3 className="text-xl font-bold">{missions.length}</h3>
                   <p className="opacity-80 text-sm">Missions</p>
                   <div className="w-full bg-yellow-200 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: `${Math.min(missions.length / 50 * 100, 100)}%` }} />
+                    <div
+                      className="bg-white h-1 rounded"
+                      style={{ width: `${Math.min(missions.length / 50 * 100, 100)}%` }}
+                    ></div>
                   </div>
                 </div>
 
@@ -281,7 +300,10 @@ export default function SuperviseurDashboard() {
                   <h3 className="text-xl font-bold">{pannes.length}</h3>
                   <p className="opacity-80 text-sm">Pannes signalées</p>
                   <div className="w-full bg-red-300 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: `${Math.min(pannes.length / 20 * 100, 100)}%` }} />
+                    <div
+                      className="bg-white h-1 rounded"
+                      style={{ width: `${Math.min(pannes.length / 20 * 100, 100)}%` }}
+                    ></div>
                   </div>
                 </div>
 
@@ -291,10 +313,10 @@ export default function SuperviseurDashboard() {
                   className="cursor-pointer bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300"
                 >
                   <FileText className="mb-2" size={28} />
-                  <h3 className="text-xl font-bold">Alertes</h3>
-                  <p className="opacity-80 text-sm">Expirations</p>
+                  <h3 className="text-xl font-bold">{criticalAlertesCount}</h3>
+                  <p className="opacity-80 text-sm">Alertes expirations</p>
                   <div className="w-full bg-purple-300 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: "100%" }} />
+                    <div className="bg-white h-1 rounded" style={{ width: "100%" }}></div>
                   </div>
                 </div>
 

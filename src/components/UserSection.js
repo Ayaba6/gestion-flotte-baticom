@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader } from "../components/ui/card.js";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
-import ResponsiveWrapper from "../components/ResponsiveWrapper.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
 import { useToast } from "../components/ui/use-toast.js";
 
@@ -103,68 +102,92 @@ export default function UserSection() {
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <Card className="shadow-xl bg-white/70 border border-gray-200">
-        <CardHeader className="flex justify-between items-center">
+        <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
           <h2 className="text-xl font-semibold">Gestion des utilisateurs</h2>
-          <Button onClick={() => { setShowModal(true); setEditingUser(null); }}>
-            <UserPlus size={18} className="mr-2" /> Créer
-          </Button>
+          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <Input
+              placeholder="🔍 Rechercher..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full md:w-64"
+            />
+            <Button onClick={() => { setShowModal(true); setEditingUser(null); }}>
+              <UserPlus size={18} className="mr-2" /> Créer
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
-      {/* Search */}
-      <Input
-        placeholder="🔍 Rechercher..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full md:w-1/3 mb-4"
-      />
+      {/* Users list */}
+      <div className="space-y-4">
+        {filteredUsers.length === 0 && <p className="text-gray-500">Aucun utilisateur trouvé.</p>}
 
-      {/* Table */}
-      <Card>
-        <CardContent>
-          <ResponsiveWrapper>
-            <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-              <thead className="bg-gray-100 text-left">
-                <tr>
-                  <th className="px-4 py-2">Nom</th>
-                  <th className="px-4 py-2">Email</th>
-                  <th className="px-4 py-2">Téléphone</th>
-                  <th className="px-4 py-2">Rôle</th>
-                  <th className="px-4 py-2">Documents</th>
-                  <th className="px-4 py-2 text-center">Actions</th>
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden text-sm sm:text-base">
+            <thead className="bg-gray-100 text-left">
+              <tr>
+                <th className="px-4 py-2">Nom</th>
+                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Téléphone</th>
+                <th className="px-4 py-2">Rôle</th>
+                <th className="px-4 py-2">Documents</th>
+                <th className="px-4 py-2 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((u) => (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2">{u.name}</td>
+                  <td className="px-4 py-2 truncate max-w-[250px]">{u.email}</td>
+                  <td className="px-4 py-2">{u.phone}</td>
+                  <td className="px-4 py-2 capitalize">{u.role}</td>
+                  <td className="px-4 py-2 space-y-1">
+                    {u.cnibUrl && <a href={u.cnibUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">CNIB</a>}
+                    {u.permisUrl && <a href={u.permisUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Permis</a>}
+                    {u.carteUrl && <a href={u.carteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Carte</a>}
+                  </td>
+                  <td className="px-4 py-2 flex justify-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { setEditingUser(u); setFormData({ ...u, password: "" }); setShowModal(true); }}>
+                      <Pencil size={14} />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDelete(u.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2">{u.name}</td>
-                    <td className="px-4 py-2">{u.email}</td>
-                    <td className="px-4 py-2">{u.phone}</td>
-                    <td className="px-4 py-2 capitalize">{u.role}</td>
-                    <td className="px-4 py-2 space-y-1">
-                      {u.cnibUrl && <a href={u.cnibUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">CNIB</a>}
-                      {u.permisUrl && <a href={u.permisUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Permis</a>}
-                      {u.carteUrl && <a href={u.carteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Carte</a>}
-                    </td>
-                    <td className="px-4 py-2 flex justify-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setEditingUser(u);
-                        setFormData({ ...u, password: "" });
-                        setShowModal(true);
-                      }}>
-                        <Pencil size={14} />
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(u.id)}>
-                        <Trash2 size={14} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ResponsiveWrapper>
-        </CardContent>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden flex flex-col gap-4">
+          {filteredUsers.map((u) => (
+            <div key={u.id} className="bg-white border border-gray-200 rounded-lg shadow p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-base">{u.name}</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setEditingUser(u); setFormData({ ...u, password: "" }); setShowModal(true); }}>
+                    <Pencil size={14} />
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleDelete(u.id)}>
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              </div>
+              <p><span className="font-medium">Email:</span> {u.email}</p>
+              <p><span className="font-medium">Téléphone:</span> {u.phone}</p>
+              <p><span className="font-medium">Rôle:</span> {u.role}</p>
+              <div className="space-x-2">
+                {u.cnibUrl && <a href={u.cnibUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">CNIB</a>}
+                {u.permisUrl && <a href={u.permisUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Permis</a>}
+                {u.carteUrl && <a href={u.carteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Carte</a>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Modal Form */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
