@@ -1,20 +1,20 @@
-// src/components/PannesDeclarees.js
 import React, { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient.js";
-import { Search, CheckCircle, Clock, Bell } from "lucide-react";
-import { toast, Toaster } from "react-hot-toast"; // installer react-hot-toast
+import { Search, CheckCircle, Clock, Bell, X } from "lucide-react";
+import { toast, Toaster } from "react-hot-toast";
 
 export default function PannesDeclarees() {
   const [pannes, setPannes] = useState([]);
   const [filter, setFilter] = useState("toutes");
   const [search, setSearch] = useState("");
   const [newCount, setNewCount] = useState(0);
+  const [selectedPanne, setSelectedPanne] = useState(null); // 🔹 Pour le modal
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   useEffect(() => {
-    // 🔹 Charger les pannes existantes
     const fetchPannes = async () => {
       const { data, error } = await supabase
-        .from("alertesPannes")
+        .from("alertespannes")
         .select(`*, chauffeur:users(id,email)`)
         .order("created_at", { ascending: false });
 
@@ -23,39 +23,25 @@ export default function PannesDeclarees() {
     };
     fetchPannes();
 
-    // 🔹 Realtime : écoute les nouvelles pannes
     const pannesChannel = supabase
       .channel("pannes")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "alertesPannes" },
+        { event: "INSERT", schema: "public", table: "alertespannes" },
         (payload) => {
           setPannes(prev => [payload.new, ...prev]);
           setNewCount(prev => prev + 1);
-          toast(`Nouvelle panne déclarée par ${payload.new.chauffeur_email || "un chauffeur"}`, { duration: 5000 });
+          toast(`Nouvelle panne déclarée par ${payload.new.chauffeur_id}`, { duration: 5000 });
         }
       )
       .subscribe();
 
-    // 🔹 Nettoyage
     return () => supabase.removeChannel(pannesChannel);
   }, []);
 
-  // 🔹 Filtrage et recherche
-  const filteredPannes = pannes.filter((p) => {
-    const matchFilter = filter === "toutes" ? true : p.statut === filter;
-    const matchSearch =
-      (p.camion || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.typePanne || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.chauffeur?.email || "").toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  });
-
-  // 🔹 Mettre à jour le statut d’une panne
   const updateStatut = async (id, newStatut) => {
     const { error } = await supabase
-      .from("alertesPannes")
+      .from("alertespannes")
       .update({ statut: newStatut })
       .eq("id", id);
 
@@ -63,9 +49,23 @@ export default function PannesDeclarees() {
     else setPannes(prev => prev.map(p => (p.id === id ? { ...p, statut: newStatut } : p)));
   };
 
+  const openPhotoModal = (panne) => {
+    setSelectedPanne(panne);
+    setShowPhotoModal(true);
+  };
+
+  const filteredPannes = pannes.filter((p) => {
+    const matchFilter = filter === "toutes" ? true : p.statut === filter;
+    const matchSearch =
+      (p.mission_id?.toString() || "").includes(search.toLowerCase()) ||
+      (p.description || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.typepanne || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.chauffeur?.email || "").toLowerCase().includes(search.toLowerCase());
+    return matchFilter && matchSearch;
+  });
+
   return (
     <div className="p-6">
-      {/* Toaster pour notifications */}
       <Toaster position="top-right" />
 
       <div className="flex items-center justify-between mb-6">
@@ -109,16 +109,17 @@ export default function PannesDeclarees() {
         </div>
       </div>
 
-      {/* Tableau des pannes */}
+      {/* Tableau */}
       <div className="overflow-x-auto bg-white rounded-2xl shadow-md border border-gray-200">
         <table className="min-w-full">
           <thead className="bg-gray-100 text-left">
             <tr>
-              <th className="p-3">Camion</th>
+              <th className="p-3">Mission</th>
               <th className="p-3">Chauffeur</th>
               <th className="p-3">Type</th>
               <th className="p-3">Description</th>
               <th className="p-3">Position GPS</th>
+              <th className="p-3">Photo</th>
               <th className="p-3">Statut</th>
               <th className="p-3">Action</th>
             </tr>
@@ -126,18 +127,39 @@ export default function PannesDeclarees() {
           <tbody>
             {filteredPannes.length === 0 ? (
               <tr>
-                <td colSpan="7" className="text-center p-6 text-gray-500 italic">
+                <td colSpan="8" className="text-center p-6 text-gray-500 italic">
                   Aucune panne trouvée
                 </td>
               </tr>
             ) : (
               filteredPannes.map(p => (
                 <tr key={p.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-semibold">{p.camion || "N/A"}</td>
+                  <td className="p-3 font-semibold">{p.mission_id || "N/A"}</td>
                   <td className="p-3">{p.chauffeur?.email || "Inconnu"}</td>
-                  <td className="p-3">{p.typePanne}</td>
+                  <td className="p-3">{p.typepanne}</td>
                   <td className="p-3">{p.description}</td>
-                  <td className="p-3">{p.latitude && p.longitude ? `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}` : "Non renseignée"}</td>
+                  <td className="p-3">
+                    {p.latitude && p.longitude ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline"
+                      >
+                        {p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}
+                      </a>
+                    ) : "Non renseignée"}
+                  </td>
+                  <td className="p-3">
+                    {p.photo ? (
+                      <img
+                        src={supabase.storage.from("pannes").getPublicUrl(p.photo).data.publicUrl}
+                        alt="Panne"
+                        className="w-20 h-20 object-cover rounded cursor-pointer"
+                        onClick={() => openPhotoModal(p)}
+                      />
+                    ) : "Non fournie"}
+                  </td>
                   <td className="p-3">
                     {p.statut === "resolu" ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">
@@ -173,6 +195,25 @@ export default function PannesDeclarees() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal photo */}
+      {showPhotoModal && selectedPanne && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-lg p-4 max-w-3xl w-full relative">
+            <button
+              onClick={() => setShowPhotoModal(false)}
+              className="absolute top-2 right-2 text-gray-700 hover:text-gray-900"
+            >
+              <X size={24} />
+            </button>
+            <img
+              src={supabase.storage.from("pannes").getPublicUrl(selectedPanne.photo).data.publicUrl}
+              alt="Panne"
+              className="w-full h-auto object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
