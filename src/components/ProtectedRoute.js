@@ -1,3 +1,4 @@
+// src/components/ProtectedRoute.js
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
@@ -8,20 +9,17 @@ export default function ProtectedRoute({ children, requiredRole }) {
 
   useEffect(() => {
     const checkUser = async () => {
-      // Récupère l'utilisateur courant
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
         console.error("Erreur auth:", error);
         setLoading(false);
         return;
       }
-
       if (!user) {
         setLoading(false);
         return;
       }
 
-      // Récupère le rôle depuis la table users
       const { data: profile, error: profileError } = await supabase
         .from("users")
         .select("role")

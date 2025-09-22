@@ -46,16 +46,23 @@ export default function MissionsSection() {
       return;
     }
     try {
-      const { data, error } = await supabase.from("missions").insert([
-        { titre, description, depart, destination, chauffeurId, camionId, statut: "a_venir" }
-      ]);
+      const { data, error } = await supabase.from("missions").insert([{
+        titre,
+        description,
+        depart,
+        destination,
+        chauffeur_id: chauffeurId,   // <== ici
+        camion_id: camionId,         // <== ici
+        statut: "a_venir"
+      }]);
       if (error) throw error;
+
       setMissions(prev => [...prev, ...(data || [])]);
       setTitre(""); setDescription(""); setDepart(""); setDestination("");
       setChauffeurId(""); setCamionId(""); setShowForm(false);
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la création de la mission");
+      alert("Erreur lors de la création de la mission. Vérifiez que chauffeur et camion sont corrects");
     }
   };
 
@@ -71,8 +78,8 @@ export default function MissionsSection() {
 
   // 🔹 Filtrage et recherche
   const filteredMissions = missions.filter(m => {
-    const chauffeur = chauffeurs.find(c => c.id === m.chauffeurId);
-    const camion = camions.find(c => c.id === m.camionId);
+    const chauffeur = chauffeurs.find(c => c.id === m.chauffeur_id); // <== ici
+    const camion = camions.find(c => c.id === m.camion_id);         // <== ici
     const chauffeurName = chauffeur ? chauffeur.name : "";
     const camionImmat = camion ? camion.immatriculation : "";
 
@@ -97,6 +104,8 @@ export default function MissionsSection() {
         return <span className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">À venir</span>;
       case "terminee":
         return <span className="flex items-center gap-1 px-2 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium"><Check size={14}/> Terminée</span>;
+      case "en_cours":
+        return <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded-full text-sm font-medium">En cours</span>;
       default:
         return <span className="px-2 py-1 bg-gray-200 text-gray-800 rounded-full text-sm font-medium">{statut}</span>;
     }
@@ -104,7 +113,7 @@ export default function MissionsSection() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-gray-800">Missions</h2>
         <button onClick={() => setShowForm(!showForm)}
@@ -113,7 +122,7 @@ export default function MissionsSection() {
         </button>
       </div>
 
-      {/* Formulaire */}
+      {/* FORMULAIRE */}
       {showForm && (
         <div className="mb-6 p-6 border rounded-lg bg-white shadow-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -134,17 +143,18 @@ export default function MissionsSection() {
         </div>
       )}
 
-      {/* Recherche et filtre */}
+      {/* RECHERCHE ET FILTRE */}
       <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
         <input type="text" placeholder="Recherche..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="p-2 border rounded w-full md:w-1/3"/>
         <select value={filterStatut} onChange={e => { setFilterStatut(e.target.value); setCurrentPage(1); }} className="p-2 border rounded w-full md:w-1/4">
           <option value="toutes">Toutes</option>
           <option value="a_venir">À venir</option>
+          <option value="en_cours">En cours</option>
           <option value="terminee">Terminées</option>
         </select>
       </div>
 
-      {/* Tableau missions */}
+      {/* TABLEAU MISSIONS */}
       <div className="overflow-x-auto shadow rounded-lg bg-white">
         <table className="min-w-full divide-y divide-gray-200 table-fixed">
           <thead className="bg-gray-100 sticky top-0 z-10">
@@ -161,8 +171,8 @@ export default function MissionsSection() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {paginatedMissions.map(m => {
-              const chauffeur = chauffeurs.find(c => c.id === m.chauffeurId);
-              const camion = camions.find(c => c.id === m.camionId);
+              const chauffeur = chauffeurs.find(c => c.id === m.chauffeur_id);
+              const camion = camions.find(c => c.id === m.camion_id);
               return (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="p-3 font-medium truncate">{m.titre}</td>
@@ -182,7 +192,7 @@ export default function MissionsSection() {
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-4 mt-4">
           <button onClick={() => setCurrentPage(p => Math.max(p-1,1))} disabled={currentPage===1} className="px-3 py-1 bg-gray-300 rounded disabled:opacity-50">Précédent</button>

@@ -21,4 +21,8 @@ function CardContent({ className, ...props }) {
   return <div className={cn("text-gray-700", className)} {...props} />
 }
 
-export { Card, CardHeader, CardContent }
+function CardTitle({ className, ...props }) {
+  return <div className={cn("text-gray-700", className)} {...props} />
+}
+
+export { Card, CardHeader, CardContent, CardTitle }

@@ -1,20 +1,29 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import "leaflet/dist/leaflet.css";
+
 import Login from "./pages/Login.js";
+
+// Dashboards
 import AdminDashboard from "./pages/AdminDashboard.js";
-import AdminUsers from "./components/AdminUsers.js";
-import AdminFlotte from "./components/AdminFlotte.js";
 import SuperviseurDashboard from "./pages/SuperviseurDashboard.js";
 import ChauffeurDashboard from "./pages/ChauffeurDashboard.js";
+
+// Admin modules
+import AdminUsers from "./components/AdminUsers.js";
+import AdminFlotte from "./components/AdminFlotte.js";
 import PannesDeclarees from "./components/PannesDeclarees.js";
+import AlertesExpiration from "./components/AlertesExpiration.js";
+
+// ProtectedRoute
 import ProtectedRoute from "./components/ProtectedRoute.js";
-import "leaflet/dist/leaflet.css";
 
 export default function App() {
   return (
     <Routes>
+      {/* Login */}
       <Route path="/login" element={<Login />} />
 
-      {/* Admin */}
+      {/* Admin routes */}
       <Route
         path="/admin"
         element={
@@ -39,6 +48,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/pannesdeclarees"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <PannesDeclarees />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/alertes-expirations"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <AlertesExpiration />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Superviseur */}
       <Route
@@ -56,16 +81,6 @@ export default function App() {
         element={
           <ProtectedRoute requiredRole="chauffeur">
             <ChauffeurDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Pannes déclarées */}
-      <Route
-        path="/pannesdeclarees"
-        element={
-          <ProtectedRoute requiredRole="admin">
-            <PannesDeclarees />
           </ProtectedRoute>
         }
       />
