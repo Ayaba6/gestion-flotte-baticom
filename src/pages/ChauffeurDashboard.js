@@ -3,24 +3,20 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
 import { toast, Toaster } from "react-hot-toast";
-import { Truck, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
+import {
+  Truck,
+  ClipboardList,
+  LayoutDashboard,
+  Menu,
+  X,
+} from "lucide-react";
 import logoSociete from "../assets/logo.png";
 import ProfileSettingsChauffeur from "../components/ProfileSettingsChauffeur.js";
-import ChauffeurTracker from "../components/ChauffeurTracker.js";
 
 // Leaflet
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-// Icône verte pour le chauffeur
-const greenIcon = new L.Icon({
-  iconUrl:
-    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
 
 export default function ChauffeurDashboard() {
   const navigate = useNavigate();
@@ -29,7 +25,6 @@ export default function ChauffeurDashboard() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [section, setSection] = useState("dashboard");
-  const [positions, setPositions] = useState([]);
 
   // Modal panne
   const [showPanneModal, setShowPanneModal] = useState(false);
@@ -43,7 +38,10 @@ export default function ChauffeurDashboard() {
   // Récupération utilisateur et missions
   useEffect(() => {
     const fetchUserAndMissions = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
       if (error || !user) {
         navigate("/login");
         return;
@@ -66,35 +64,10 @@ export default function ChauffeurDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Récupérer positions existantes
-    const fetchPositions = async () => {
-      const { data } = await supabase
-        .from("positions")
-        .select("*")
-        .eq("chauffeur_id", user.id)
-        .order("created_at", { ascending: true });
-      setPositions(data || []);
-    };
-    fetchPositions();
-
-    // Abonnement temps réel Supabase
-    const channel = supabase
-      .channel("chauffeur-positions")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "positions" },
-        (payload) => {
-          if (payload.new.chauffeur_id === user.id) {
-            setPositions((prev) => [...prev, payload.new]);
-          }
-        }
-      )
-      .subscribe();
-
-    // Geolocation en continu
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+
         await supabase.from("positions").insert([
           {
             chauffeur_id: user.id,
@@ -107,10 +80,7 @@ export default function ChauffeurDashboard() {
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
     );
 
-    return () => {
-      supabase.removeChannel(channel);
-      navigator.geolocation.clearWatch(watchId);
-    };
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [user]);
 
   const handleLogout = async () => {
@@ -212,12 +182,12 @@ export default function ChauffeurDashboard() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gray-100 relative">
       <Toaster position="top-right" />
 
       {/* Sidebar mobile */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex">
+        <div className="fixed inset-0 z-50 flex">
           <aside className="bg-blue-900 text-white w-64 flex flex-col p-6 shadow-xl">
             <div className="flex flex-col items-center mb-6">
               <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
@@ -243,12 +213,15 @@ export default function ChauffeurDashboard() {
               Déconnexion
             </button>
           </aside>
-          <div className="flex-1 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />
+          <div
+            className="flex-1 bg-black bg-opacity-50"
+            onClick={() => setSidebarOpen(false)}
+          />
         </div>
       )}
 
       {/* Sidebar desktop */}
-      <aside className="bg-blue-900 text-white w-64 hidden md:flex flex-col p-6 shadow-xl">
+      <aside className="bg-blue-900 text-white w-64 hidden md:flex flex-col p-6 shadow-xl z-40">
         <div className="flex flex-col items-center mb-8">
           <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
           <h2 className="text-2xl font-bold">BATICOM</h2>
@@ -275,9 +248,9 @@ export default function ChauffeurDashboard() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col z-0">
         {/* HEADER */}
-        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center">
+        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative z-10">
           <div className="flex items-center space-x-3">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden text-blue-900">
               <Menu size={28} />
@@ -321,29 +294,14 @@ export default function ChauffeurDashboard() {
               </div>
 
               {/* Carte interactive */}
-              <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mt-6">
-                <MapContainer center={center} zoom={13} className="h-full w-full">
+              <div className="relative z-0 h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mt-6">
+                <MapContainer center={center} zoom={13} className="h-full w-full z-0">
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
-
-                  {/* Composant pour tracker et envoyer la position */}
-                  {user && <ChauffeurTracker missionId={missionsEnCours[0]?.id} userId={user.id} />}
-
-                  {/* Affichage du trajet et du marker */}
-                  {positions.length > 0 && (
-                    <>
-                      <Polyline positions={positions.map((p) => [p.latitude, p.longitude])} color="blue" />
-                      <Marker
-                        position={[positions[positions.length - 1].latitude, positions[positions.length - 1].longitude]}
-                        icon={greenIcon}
-                      >
-                        <Popup>
-                          Dernière position : {new Date(positions[positions.length - 1].created_at).toLocaleTimeString()}
-                        </Popup>
-                      </Marker>
-                    </>
+                  {missionsEnCours.length > 0 && (
+                    <ChauffeurTrajet chauffeurId={user.id} />
                   )}
                 </MapContainer>
               </div>
@@ -448,5 +406,51 @@ export default function ChauffeurDashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+// Composant pour afficher le trajet du chauffeur
+function ChauffeurTrajet({ chauffeurId }) {
+  const [positions, setPositions] = useState([]);
+
+  useEffect(() => {
+    const fetchPositions = async () => {
+      const { data } = await supabase
+        .from("positions")
+        .select("*")
+        .eq("chauffeur_id", chauffeurId)
+        .order("created_at", { ascending: true });
+      setPositions(data || []);
+    };
+    fetchPositions();
+
+    const channel = supabase
+      .channel("chauffeur-positions")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "positions" },
+        (payload) => {
+          if (payload.new.chauffeur_id === chauffeurId) {
+            setPositions((prev) => [...prev, payload.new]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [chauffeurId]);
+
+  if (positions.length === 0) return null;
+
+  const polyline = positions.map((p) => [p.latitude, p.longitude]);
+  const lastPos = positions[positions.length - 1];
+
+  return (
+    <>
+      <Polyline positions={polyline} color="blue" />
+      <Marker position={[lastPos.latitude, lastPos.longitude]}>
+        <Popup>Dernière position : {new Date(lastPos.created_at).toLocaleTimeString()}</Popup>
+      </Marker>
+    </>
   );
 }

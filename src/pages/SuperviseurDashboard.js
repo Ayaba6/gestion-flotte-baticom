@@ -114,7 +114,7 @@ export default function SuperviseurDashboard() {
 
       {/* Sidebar mobile */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex">
+        <div className="fixed inset-0 z-50 flex">
           <aside className="bg-blue-900 text-white w-64 flex flex-col p-6 shadow-xl">
             <div className="flex flex-col items-center mb-6">
               <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
@@ -255,7 +255,7 @@ export default function SuperviseurDashboard() {
               </div>
 
               {/* Carte interactive flotte */}
-              <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden">
+              <div className="relative z-0 h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden">
                 <CarteFlotte chauffeurs={chauffeurs} />
               </div>
             </>

@@ -1,9 +1,9 @@
 // src/pages/AdminDashboard.js
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
 import logoSociete from "../assets/logo.png";
-import { Users, Truck, ClipboardList, Menu, X, LogOut } from "lucide-react";
+import { Users, Truck, ClipboardList, Menu, X } from "lucide-react";
 
 // Sections
 import UserSection from "../components/UserSection.js";
@@ -12,45 +12,8 @@ import MissionsSection from "../components/MissionsSection.js";
 import PannesDeclarees from "../components/PannesDeclarees.js";
 import AlertesExpiration from "../components/AlertesExpiration.js";
 
-// Map imports
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// Icônes colorées
-const greenIcon = new L.Icon({
-  iconUrl:
-    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-const redIcon = new L.Icon({
-  iconUrl:
-    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-const orangeIcon = new L.Icon({
-  iconUrl:
-    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
-// Fonction pour adapter la vue aux positions
-function FitBounds({ camions }) {
-  const map = useMap();
-  useEffect(() => {
-    if (camions.length > 0) {
-      const bounds = camions.map((c) => [c.latitude, c.longitude]);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [camions, map]);
-  return null;
-}
+// Carte flotte
+import CarteFlotte from "../components/CarteFlotte.js";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -65,10 +28,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) {
         navigate("/login");
         return;
@@ -86,7 +46,6 @@ export default function AdminDashboard() {
         missions: missions?.length || 0,
       });
       setCamions(camionsData || []);
-
       setLoading(false);
     };
     fetchData();
@@ -120,13 +79,6 @@ export default function AdminDashboard() {
     navigate("/login");
   };
 
-  const getMarkerIcon = (camion) => {
-    if (camion.statut === "actif") return greenIcon;
-    if (camion.statut === "en_panne") return redIcon;
-    if (camion.statut === "en_mission") return orangeIcon;
-    return greenIcon;
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -149,11 +101,7 @@ export default function AdminDashboard() {
       {/* Sidebar desktop */}
       <aside className="bg-blue-900 text-white w-64 hidden md:flex flex-col p-6 shadow-xl">
         <div className="flex flex-col items-center mb-8">
-          <img
-            src={logoSociete}
-            alt="Logo"
-            className="w-16 h-16 object-contain mb-2"
-          />
+          <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
           <h2 className="text-2xl font-bold">Admin</h2>
         </div>
         <nav className="flex-1 flex flex-col gap-3">
@@ -180,24 +128,13 @@ export default function AdminDashboard() {
       {/* Sidebar mobile overlay */}
       {menuOpen && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50"
-            onClick={() => setMenuOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setMenuOpen(false)} />
           <aside className="bg-blue-900 text-white w-64 flex flex-col p-6 shadow-xl z-50 relative">
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="absolute top-4 right-4 text-white"
-            >
+            <button onClick={() => setMenuOpen(false)} className="absolute top-4 right-4 text-white">
               <X size={24} />
             </button>
             <div className="flex flex-col items-center mb-8">
-              <img
-                src={logoSociete}
-                alt="Logo"
-                className="w-16 h-16 object-contain mb-2"
-              />
+              <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
               <h2 className="text-2xl font-bold">Admin</h2>
             </div>
             <nav className="flex-1 flex flex-col gap-3">
@@ -231,10 +168,7 @@ export default function AdminDashboard() {
         {/* HEADER */}
         <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="md:hidden text-blue-900"
-            >
+            <button onClick={() => setMenuOpen(true)} className="md:hidden text-blue-900">
               <Menu size={28} />
             </button>
             <h1 className="text-xl font-bold text-green-700">Admin</h1>
@@ -245,52 +179,26 @@ export default function AdminDashboard() {
         <div className="flex-1 flex flex-col p-4 sm:p-6">
           {section === "dashboard" && (
             <>
-              {/* Carte interactive */}
+              {/* Carte interactive flotte */}
               <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mb-6">
-                <MapContainer center={center} zoom={13} className="h-full w-full">
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
-                  />
-                  {camions
-                    .filter((c) => c.latitude && c.longitude)
-                    .map((c) => (
-                      <Marker
-                        key={c.id}
-                        position={[c.latitude, c.longitude]}
-                        icon={getMarkerIcon(c)}
-                      >
-                        <Popup>
-                          Camion {c.immatriculation || c.id} <br /> Statut:{" "}
-                          {c.statut}
-                        </Popup>
-                      </Marker>
-                    ))}
-                  <FitBounds camions={camions.filter((c) => c.latitude && c.longitude)} />
-                </MapContainer>
+                <CarteFlotte camions={camions} />
               </div>
 
               {/* Stat cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-blue-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
                   <Users className="text-blue-600 w-16 h-16 mb-4" />
-                  <h3 className="font-bold text-lg mb-2 text-blue-800">
-                    Utilisateurs
-                  </h3>
+                  <h3 className="font-bold text-lg mb-2 text-blue-800">Utilisateurs</h3>
                   <p className="text-blue-700 text-xl">{stats.users}</p>
                 </div>
                 <div className="bg-green-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
                   <Truck className="text-green-600 w-16 h-16 mb-4" />
-                  <h3 className="font-bold text-lg mb-2 text-green-800">
-                    Véhicules
-                  </h3>
+                  <h3 className="font-bold text-lg mb-2 text-green-800">Véhicules</h3>
                   <p className="text-green-700 text-xl">{stats.camions}</p>
                 </div>
                 <div className="bg-orange-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
                   <ClipboardList className="text-orange-600 w-16 h-16 mb-4" />
-                  <h3 className="font-bold text-lg mb-2 text-orange-800">
-                    Missions
-                  </h3>
+                  <h3 className="font-bold text-lg mb-2 text-orange-800">Missions</h3>
                   <p className="text-orange-700 text-xl">{stats.missions}</p>
                 </div>
               </div>
