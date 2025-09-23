@@ -5,7 +5,7 @@ import { supabase } from "../services/supabaseClient.js";
 import { toast, Toaster } from "react-hot-toast";
 import {
   LayoutDashboard, ClipboardList, AlertTriangle, FileText,
-  Users, Truck, Activity, Menu
+  Users, Truck, Menu
 } from "lucide-react";
 
 import logoSociete from "../assets/logo.png";
@@ -16,30 +16,8 @@ import PannesDeclarees from "../components/PannesDeclarees.js";
 import AlertesExpiration from "../components/AlertesExpiration.js";
 import ProfileSettings from "../components/ProfileSettings.js";
 
-// Map imports
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from "leaflet";
-
-// Icônes colorées pour la carte
-const greenIcon = new L.Icon({
-  iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-const redIcon = new L.Icon({
-  iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-const orangeIcon = new L.Icon({
-  iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
+// Carte flotte
+import CarteFlotte from "../components/CarteFlotte.js";
 
 export default function SuperviseurDashboard() {
   const [section, setSection] = useState("dashboard");
@@ -83,7 +61,7 @@ export default function SuperviseurDashboard() {
 
       const { data: pannesData } = await supabase
         .from("alertesPannes")
-        .select("*, chauffeur:users(id,email)")
+        .select("*, chauffeur:users(id,email,user_metadata,camion_id)")
         .order("created_at", { ascending: false });
       setPannes(pannesData || []);
 
@@ -128,14 +106,6 @@ export default function SuperviseurDashboard() {
     navigate("/login");
   };
 
-  const getMarkerIcon = (camion) => {
-    if (camion.statut === "actif") return greenIcon;
-    if (camion.statut === "en_panne") return redIcon;
-    if (camion.statut === "en_mission") return orangeIcon;
-    return greenIcon;
-  };
-
-  // Calcul du nombre d'alertes critiques
   const criticalAlertesCount = alertes.filter(a => a.criticite === "critique").length;
 
   return (
@@ -248,34 +218,16 @@ export default function SuperviseurDashboard() {
             <>
               {/* Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
-                
-                {/* Camions card */}
                 <div className="bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
                   <Truck className="mb-2" size={28} />
                   <h3 className="text-xl font-bold">{camions.length}</h3>
                   <p className="opacity-80 text-sm">Camions actifs</p>
-                  <div className="w-full bg-blue-300 h-1 rounded mt-2">
-                    <div
-                      className="bg-white h-1 rounded"
-                      style={{ width: `${Math.min(camions.length / 50 * 100, 100)}%` }}
-                    ></div>
-                  </div>
                 </div>
-
-                {/* Chauffeurs card */}
                 <div className="bg-gradient-to-r from-green-500 to-green-700 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
                   <Users className="mb-2" size={28} />
                   <h3 className="text-xl font-bold">{chauffeurs.length}</h3>
                   <p className="opacity-80 text-sm">Chauffeurs</p>
-                  <div className="w-full bg-green-300 h-1 rounded mt-2">
-                    <div
-                      className="bg-white h-1 rounded"
-                      style={{ width: `${Math.min(chauffeurs.length / 50 * 100, 100)}%` }}
-                    ></div>
-                  </div>
                 </div>
-
-                {/* Missions card clickable */}
                 <div 
                   onClick={() => setSection("missions")}
                   className="cursor-pointer bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300"
@@ -283,15 +235,7 @@ export default function SuperviseurDashboard() {
                   <ClipboardList className="mb-2" size={28} />
                   <h3 className="text-xl font-bold">{missions.length}</h3>
                   <p className="opacity-80 text-sm">Missions</p>
-                  <div className="w-full bg-yellow-200 h-1 rounded mt-2">
-                    <div
-                      className="bg-white h-1 rounded"
-                      style={{ width: `${Math.min(missions.length / 50 * 100, 100)}%` }}
-                    ></div>
-                  </div>
                 </div>
-
-                {/* Pannes card clickable */}
                 <div 
                   onClick={() => setSection("pannes")}
                   className={`cursor-pointer rounded-xl shadow p-4 transform transition hover:scale-105 duration-300 text-white ${pannes.length > 5 ? 'bg-gradient-to-r from-red-600 to-red-800' : 'bg-gradient-to-r from-red-400 to-red-600'}`}
@@ -299,15 +243,7 @@ export default function SuperviseurDashboard() {
                   <AlertTriangle className="mb-2" size={28} />
                   <h3 className="text-xl font-bold">{pannes.length}</h3>
                   <p className="opacity-80 text-sm">Pannes signalées</p>
-                  <div className="w-full bg-red-300 h-1 rounded mt-2">
-                    <div
-                      className="bg-white h-1 rounded"
-                      style={{ width: `${Math.min(pannes.length / 20 * 100, 100)}%` }}
-                    ></div>
-                  </div>
                 </div>
-
-                {/* Alertes expirations card clickable */}
                 <div
                   onClick={() => setSection("documents")}
                   className="cursor-pointer bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300"
@@ -315,34 +251,12 @@ export default function SuperviseurDashboard() {
                   <FileText className="mb-2" size={28} />
                   <h3 className="text-xl font-bold">{criticalAlertesCount}</h3>
                   <p className="opacity-80 text-sm">Alertes expirations</p>
-                  <div className="w-full bg-purple-300 h-1 rounded mt-2">
-                    <div className="bg-white h-1 rounded" style={{ width: "100%" }}></div>
-                  </div>
                 </div>
-
               </div>
 
-              {/* Carte interactive */}
+              {/* Carte interactive flotte */}
               <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden">
-                <MapContainer center={center} zoom={13} className="h-full w-full">
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
-                  />
-                  {camions
-                    .filter(c => c.latitude && c.longitude)
-                    .map(c => (
-                      <Marker
-                        key={c.id}
-                        position={[c.latitude, c.longitude]}
-                        icon={getMarkerIcon(c)}
-                      >
-                        <Popup>
-                          Camion {c.immatriculation || c.id} <br /> Statut: {c.statut}
-                        </Popup>
-                      </Marker>
-                  ))}
-                </MapContainer>
+                <CarteFlotte chauffeurs={chauffeurs} />
               </div>
             </>
           )}

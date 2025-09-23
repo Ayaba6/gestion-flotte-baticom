@@ -1,64 +1,130 @@
 // src/components/CarteFlotte.js
-import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import React, { useEffect, useState, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { supabase } from "../services/supabaseClient.js";
 
-// 🔹 Icône personnalisée
-const camionIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/743/743922.png",
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
+// Icône personnalisée pour les chauffeurs
+const greenIcon = new L.Icon({
+  iconUrl:
+    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
 });
 
-export default function CarteFlotte() {
-  const [camions, setCamions] = useState([]);
+// Palette de couleurs pour les trajets
+const colors = ["blue", "red", "orange", "purple", "teal", "brown", "pink", "cyan"];
 
+export default function CarteFlotte({ chauffeurs }) {
+  const [positions, setPositions] = useState([]);
+  const [selectedChauffeur, setSelectedChauffeur] = useState(null);
+
+  const center = useMemo(() => [12.37, -1.53], []);
+
+  // Charger les positions initiales et abonner aux changements
   useEffect(() => {
-    const fetchCamions = async () => {
-      // 🔹 Exemple : table "vehicles" avec latitude/longitude
+    const fetchPositions = async () => {
       const { data, error } = await supabase
-        .from("vehicles")
-        .select("id, immatriculation, latitude, longitude");
-
-      if (error) {
-        console.error("Erreur fetch camions:", error);
-      } else {
-        setCamions(data || []);
-      }
+        .from("positions")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (!error) setPositions(data || []);
     };
 
-    fetchCamions();
+    fetchPositions();
+
+    // Abonnement en temps réel
+    const channel = supabase
+      .channel("positions-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "positions" },
+        (payload) => {
+          setPositions((prev) => [...prev, payload.new]);
+        }
+      )
+      .subscribe();
+
+    // Rafraîchissement toutes les 5 secondes
+    const interval = setInterval(fetchPositions, 5000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
-  return (
-    <div className="p-6">
-      <h2 className="text-3xl font-bold mb-6">🗺️ Carte de la flotte</h2>
+  const getColorForChauffeur = (chauffeurId) => {
+    const index = chauffeurs.findIndex((c) => c.id === chauffeurId);
+    return colors[index % colors.length];
+  };
 
-      <MapContainer
-        center={[12.3686, -1.5272]} // 🔹 par défaut Ouagadougou
-        zoom={13}
-        style={{ height: "70vh", width: "100%" }}
-      >
+  const getLastPosition = (chauffeurId) => {
+    const trajets = positions.filter((p) => p.chauffeur_id === chauffeurId);
+    return trajets.length > 0 ? trajets[trajets.length - 1] : null;
+  };
+
+  return (
+    <div className="w-full h-[500px] rounded-xl shadow relative">
+      {/* Menu de sélection du chauffeur */}
+      <div className="absolute top-2 left-2 z-[1000] bg-white p-2 rounded shadow">
+        <select
+          className="border p-1 rounded"
+          value={selectedChauffeur || ""}
+          onChange={(e) => setSelectedChauffeur(e.target.value || null)}
+        >
+          <option value="">-- Voir tous les chauffeurs --</option>
+          {chauffeurs.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.email || c.id}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Carte Leaflet */}
+      <MapContainer center={center} zoom={13} className="h-full w-full">
         <TileLayer
-          attribution='&copy; OpenStreetMap'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="&copy; OpenStreetMap contributors"
         />
 
-        {camions.map((c) => (
-          <Marker
-            key={c.id}
-            position={[c.latitude || 12.3686, c.longitude || -1.5272]}
-            icon={camionIcon}
-          >
-            <Popup>
-              <b>{c.immatriculation || "Camion"}</b>
-              <br />
-              {c.latitude?.toFixed(5)}, {c.longitude?.toFixed(5)}
-            </Popup>
-          </Marker>
-        ))}
+        {chauffeurs
+          .filter((c) => !selectedChauffeur || c.id === selectedChauffeur)
+          .map((ch) => {
+            const trajets = positions.filter((p) => p.chauffeur_id === ch.id);
+            const polyline = trajets.map((p) => [p.latitude, p.longitude]);
+            const lastPos = getLastPosition(ch.id);
+
+            return (
+              <React.Fragment key={ch.id}>
+                {/* Tracé du trajet */}
+                {polyline.length > 1 && (
+                  <Polyline positions={polyline} color={getColorForChauffeur(ch.id)} />
+                )}
+
+                {/* Dernière position */}
+                {lastPos && (
+                  <Marker
+                    position={[lastPos.latitude, lastPos.longitude]}
+                    icon={greenIcon}
+                  >
+                    <Popup>
+                      <div>
+                        <b>Chauffeur:</b> {ch.email || ch.id} <br />
+                        <b>Nom:</b> {ch.user_metadata?.nom || "N/A"} <br />
+                        <b>Camion:</b> {ch.camion_id || "Non assigné"} <br />
+                        <b>Dernière maj:</b>{" "}
+                        {new Date(lastPos.created_at).toLocaleTimeString()}
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+              </React.Fragment>
+            );
+          })}
       </MapContainer>
     </div>
   );

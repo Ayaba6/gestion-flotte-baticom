@@ -3,24 +3,33 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
 import { toast, Toaster } from "react-hot-toast";
-import {
-  Truck,
-  ClipboardList,
-  LayoutDashboard,
-  Menu,
-  X,
-} from "lucide-react";
+import { Truck, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
 import logoSociete from "../assets/logo.png";
 import ProfileSettingsChauffeur from "../components/ProfileSettingsChauffeur.js";
+import ChauffeurTracker from "../components/ChauffeurTracker.js";
+
+// Leaflet
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Icône verte pour le chauffeur
+const greenIcon = new L.Icon({
+  iconUrl:
+    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
 
 export default function ChauffeurDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [section, setSection] = useState("dashboard");
+  const [positions, setPositions] = useState([]);
 
   // Modal panne
   const [showPanneModal, setShowPanneModal] = useState(false);
@@ -29,15 +38,12 @@ export default function ChauffeurDashboard() {
   const [descriptionPanne, setDescriptionPanne] = useState("");
   const [photo, setPhoto] = useState(null);
 
-  // Center map (optionnel)
   const center = useMemo(() => [12.37, -1.53], []);
 
+  // Récupération utilisateur et missions
   useEffect(() => {
     const fetchUserAndMissions = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) {
         navigate("/login");
         return;
@@ -55,6 +61,57 @@ export default function ChauffeurDashboard() {
     };
     fetchUserAndMissions();
   }, [navigate]);
+
+  // Suivi GPS en temps réel
+  useEffect(() => {
+    if (!user) return;
+
+    // Récupérer positions existantes
+    const fetchPositions = async () => {
+      const { data } = await supabase
+        .from("positions")
+        .select("*")
+        .eq("chauffeur_id", user.id)
+        .order("created_at", { ascending: true });
+      setPositions(data || []);
+    };
+    fetchPositions();
+
+    // Abonnement temps réel Supabase
+    const channel = supabase
+      .channel("chauffeur-positions")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "positions" },
+        (payload) => {
+          if (payload.new.chauffeur_id === user.id) {
+            setPositions((prev) => [...prev, payload.new]);
+          }
+        }
+      )
+      .subscribe();
+
+    // Geolocation en continu
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        await supabase.from("positions").insert([
+          {
+            chauffeur_id: user.id,
+            latitude,
+            longitude,
+          },
+        ]);
+      },
+      (err) => console.error("Erreur GPS:", err),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
+
+    return () => {
+      supabase.removeChannel(channel);
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -226,7 +283,6 @@ export default function ChauffeurDashboard() {
               <Menu size={28} />
             </button>
           </div>
-
           <div className="flex items-center gap-4">
             <span className="text-gray-700 font-medium text-sm sm:text-base truncate max-w-[200px] sm:max-w-[250px]">
               {user?.email}
@@ -244,23 +300,54 @@ export default function ChauffeurDashboard() {
         {/* Contenu principal */}
         <div className="flex-1 flex flex-col p-4 sm:p-6">
           {section === "dashboard" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-              <div className="bg-blue-500 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
-                <ClipboardList className="mb-2" size={28} />
-                <h3 className="text-xl font-bold">{missionsEnCours.length}</h3>
-                <p className="opacity-80 text-sm">Missions en cours</p>
+            <>
+              {/* Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
+                <div className="bg-blue-500 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
+                  <ClipboardList className="mb-2" size={28} />
+                  <h3 className="text-xl font-bold">{missionsEnCours.length}</h3>
+                  <p className="opacity-80 text-sm">Missions en cours</p>
+                </div>
+                <div className="bg-green-500 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
+                  <ClipboardList className="mb-2" size={28} />
+                  <h3 className="text-xl font-bold">{missionsTerminees.length}</h3>
+                  <p className="opacity-80 text-sm">Missions terminées</p>
+                </div>
+                <div className="bg-yellow-400 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
+                  <ClipboardList className="mb-2" size={28} />
+                  <h3 className="text-xl font-bold">{missionsAVenir.length}</h3>
+                  <p className="opacity-80 text-sm">Missions à venir</p>
+                </div>
               </div>
-              <div className="bg-green-500 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
-                <ClipboardList className="mb-2" size={28} />
-                <h3 className="text-xl font-bold">{missionsTerminees.length}</h3>
-                <p className="opacity-80 text-sm">Missions terminées</p>
+
+              {/* Carte interactive */}
+              <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mt-6">
+                <MapContainer center={center} zoom={13} className="h-full w-full">
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+
+                  {/* Composant pour tracker et envoyer la position */}
+                  {user && <ChauffeurTracker missionId={missionsEnCours[0]?.id} userId={user.id} />}
+
+                  {/* Affichage du trajet et du marker */}
+                  {positions.length > 0 && (
+                    <>
+                      <Polyline positions={positions.map((p) => [p.latitude, p.longitude])} color="blue" />
+                      <Marker
+                        position={[positions[positions.length - 1].latitude, positions[positions.length - 1].longitude]}
+                        icon={greenIcon}
+                      >
+                        <Popup>
+                          Dernière position : {new Date(positions[positions.length - 1].created_at).toLocaleTimeString()}
+                        </Popup>
+                      </Marker>
+                    </>
+                  )}
+                </MapContainer>
               </div>
-              <div className="bg-yellow-400 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
-                <ClipboardList className="mb-2" size={28} />
-                <h3 className="text-xl font-bold">{missionsAVenir.length}</h3>
-                <p className="opacity-80 text-sm">Missions à venir</p>
-              </div>
-            </div>
+            </>
           )}
 
           {section === "missions" && (
