@@ -1,47 +1,85 @@
 // src/components/CarteFlotte.js
-import React, { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import React, { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { supabase } from "../services/supabaseClient.js";
 
-// Fonction pour adapter la vue aux positions
-function FitBounds({ positions }) {
-  const map = useMap();
+import driverIconImg from "../assets/driver.png";
+import truckIconImg from "../assets/truck.png";
+
+// Icône chauffeur
+const driverIcon = new L.Icon({
+  iconUrl: driverIconImg,
+  iconSize: [35, 35],
+  iconAnchor: [17, 35],
+});
+
+// Icône camion
+const truckIcon = new L.Icon({
+  iconUrl: truckIconImg,
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+});
+
+export default function CarteFlotte() {
+  const [positions, setPositions] = useState([]);
+
   useEffect(() => {
-    if (positions && positions.length > 0) {
-      map.fitBounds(positions, { padding: [50, 50] });
-    }
-  }, [positions, map]);
-  return null;
-}
+    // Charger les positions initiales
+    fetchPositions();
 
-export default function CarteFlotte({ camions = [], chauffeurs = [] }) {
-  // On choisit la liste à utiliser : camions si présents, sinon chauffeurs
-  const data = camions.length > 0 ? camions : chauffeurs;
-  const positions = data
-    .filter((c) => c.latitude && c.longitude)
-    .map((c) => [c.latitude, c.longitude]);
+    // Abonnement en temps réel
+    const channel = supabase
+      .channel("positions-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "positions" },
+        (payload) => {
+          console.log("Changement position détecté:", payload);
+          fetchPositions();
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  async function fetchPositions() {
+    const { data, error } = await supabase
+      .from("positions")
+      .select("id, chauffeur_id, latitude, longitude, speed, heading, created_at");
+
+    if (!error && data) {
+      setPositions(data);
+    }
+  }
 
   return (
     <MapContainer
-      center={[12.37, -1.53]}
+      center={[12.37, -1.53]} // Exemple : Ouagadougou
       zoom={13}
-      className="h-full w-full relative z-0"   // ✅ empêche la carte de passer au-dessus du menu
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OpenStreetMap contributors"
       />
-      {data
-        .filter((c) => c.latitude && c.longitude)
-        .map((c, idx) => (
-          <Marker key={c.id || idx} position={[c.latitude, c.longitude]}>
-            <Popup>
-              {c.immatriculation || c.nom || c.id} <br />
-              Statut: {c.statut || "N/A"}
-            </Popup>
-          </Marker>
-        ))}
-      <FitBounds positions={positions} />
+
+      {positions.map((pos) => (
+        <Marker
+          key={pos.id}
+          position={[pos.latitude, pos.longitude]}
+          icon={driverIcon}
+        >
+          <Popup>
+            <b>Chauffeur:</b> {pos.chauffeur_id || "Inconnu"} <br />
+            <b>Vitesse:</b> {pos.speed || 0} km/h <br />
+            <b>Maj:</b>{" "}
+            {pos.created_at ? new Date(pos.created_at).toLocaleString() : ""}
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }
