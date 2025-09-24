@@ -3,19 +3,14 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
 import { toast, Toaster } from "react-hot-toast";
-import {
-  Truck,
-  ClipboardList,
-  LayoutDashboard,
-  Menu,
-  X,
-} from "lucide-react";
+import { Truck, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
 import logoSociete from "../assets/logo.png";
-import ProfileSettingsChauffeur from "../components/ProfileSettingsChauffeur.js";
+
+// Profil unifié
+import ProfilUser from "../components/ProfilUser.js";
 
 // Leaflet
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 export default function ChauffeurDashboard() {
@@ -33,19 +28,20 @@ export default function ChauffeurDashboard() {
   const [descriptionPanne, setDescriptionPanne] = useState("");
   const [photo, setPhoto] = useState(null);
 
-  const center = useMemo(() => [12.37, -1.53], []);
+  const [positions, setPositions] = useState([]);
+  const center = useMemo(
+    () =>
+      positions.length > 0
+        ? [positions[positions.length - 1].latitude, positions[positions.length - 1].longitude]
+        : [12.37, -1.53],
+    [positions]
+  );
 
   // Récupération utilisateur et missions
   useEffect(() => {
     const fetchUserAndMissions = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-      if (error || !user) {
-        navigate("/login");
-        return;
-      }
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) return navigate("/login");
       setUser(user);
 
       const { data: missionsData } = await supabase
@@ -53,7 +49,6 @@ export default function ChauffeurDashboard() {
         .select("*")
         .eq("chauffeur_id", user.id)
         .order("created_at", { ascending: false });
-
       setMissions(missionsData || []);
       setLoading(false);
     };
@@ -67,14 +62,13 @@ export default function ChauffeurDashboard() {
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        setPositions(prev => [...prev, { latitude, longitude, created_at: new Date() }]);
 
-        await supabase.from("positions").insert([
-          {
-            chauffeur_id: user.id,
-            latitude,
-            longitude,
-          },
-        ]);
+        await supabase.from("positions").insert([{
+          chauffeur_id: user.id,
+          latitude,
+          longitude
+        }]);
       },
       (err) => console.error("Erreur GPS:", err),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
@@ -83,33 +77,14 @@ export default function ChauffeurDashboard() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [user]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
   const startMission = async (mission) => {
-    await supabase
-      .from("missions")
-      .update({ statut: "en_cours" })
-      .eq("id", mission.id);
-    setMissions((prev) =>
-      prev.map((m) =>
-        m.id === mission.id ? { ...m, statut: "en_cours" } : m
-      )
-    );
+    await supabase.from("missions").update({ statut: "en_cours" }).eq("id", mission.id);
+    setMissions(prev => prev.map(m => m.id === mission.id ? { ...m, statut: "en_cours" } : m));
   };
 
   const finishMission = async (mission) => {
-    await supabase
-      .from("missions")
-      .update({ statut: "terminee" })
-      .eq("id", mission.id);
-    setMissions((prev) =>
-      prev.map((m) =>
-        m.id === mission.id ? { ...m, statut: "terminee" } : m
-      )
-    );
+    await supabase.from("missions").update({ statut: "terminee" }).eq("id", mission.id);
+    setMissions(prev => prev.map(m => m.id === mission.id ? { ...m, statut: "terminee" } : m));
   };
 
   const declarePanne = async () => {
@@ -118,15 +93,8 @@ export default function ChauffeurDashboard() {
     let latitude = null, longitude = null;
     await new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          latitude = pos.coords.latitude;
-          longitude = pos.coords.longitude;
-          resolve();
-        },
-        (err) => {
-          console.error(err);
-          resolve();
-        }
+        (pos) => { latitude = pos.coords.latitude; longitude = pos.coords.longitude; resolve(); },
+        (err) => { console.error(err); resolve(); }
       );
     });
 
@@ -134,51 +102,37 @@ export default function ChauffeurDashboard() {
     if (photo) {
       const fileExt = photo.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("pannes")
-        .upload(fileName, photo, { upsert: true });
+      const { data, error } = await supabase.storage.from("pannes").upload(fileName, photo, { upsert: true });
       if (!error) photoUrl = data.path;
     }
 
-    const { error } = await supabase.from("alertespannes").insert([
-      {
-        mission_id: selectedMission.id,
-        chauffeur_id: user.id,
-        typepanne: typePanne,
-        description: descriptionPanne,
-        photo: photoUrl,
-        latitude,
-        longitude,
-      },
-    ]);
+    const { error } = await supabase.from("alertespannes").insert([{
+      mission_id: selectedMission.id,
+      chauffeur_id: user.id,
+      typepanne: typePanne,
+      description: descriptionPanne,
+      photo: photoUrl,
+      latitude,
+      longitude
+    }]);
 
-    if (error) {
-      console.error(error);
-      toast.error("Erreur lors de la déclaration de panne !");
-    } else {
+    if (error) toast.error("Erreur lors de la déclaration de panne !");
+    else {
       toast.success("Panne déclarée !");
       setShowPanneModal(false);
-      setTypePanne("");
-      setDescriptionPanne("");
-      setPhoto(null);
+      setTypePanne(""); setDescriptionPanne(""); setPhoto(null);
     }
   };
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        Chargement...
-      </div>
-    );
+  if (loading) return <div className="flex items-center justify-center h-screen">Chargement...</div>;
 
-  const missionsEnCours = missions.filter((m) => m.statut === "en_cours");
-  const missionsTerminees = missions.filter((m) => m.statut === "terminee");
-  const missionsAVenir = missions.filter((m) => m.statut === "a_venir");
+  const missionsEnCours = missions.filter(m => m.statut === "en_cours");
+  const missionsTerminees = missions.filter(m => m.statut === "terminee");
+  const missionsAVenir = missions.filter(m => m.statut === "a_venir");
 
   const menuItems = [
     { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { key: "missions", label: "Missions", icon: <ClipboardList size={18} /> },
-    { key: "profil", label: "Profil", icon: <Truck size={18} /> },
   ];
 
   return (
@@ -194,29 +148,18 @@ export default function ChauffeurDashboard() {
               <h2 className="text-2xl font-bold">BATICOM</h2>
             </div>
             <nav className="flex-1 flex flex-col gap-3">
-              {menuItems.map((item) => (
+              {menuItems.map(item => (
                 <button
                   key={item.key}
                   onClick={() => { setSection(item.key); setSidebarOpen(false); }}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${
-                    section === item.key ? "bg-blue-700" : "hover:bg-blue-800"
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${section === item.key ? "bg-blue-700" : "hover:bg-blue-800"}`}
                 >
                   {item.icon} {item.label}
                 </button>
               ))}
             </nav>
-            <button
-              onClick={handleLogout}
-              className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold"
-            >
-              Déconnexion
-            </button>
           </aside>
-          <div
-            className="flex-1 bg-black bg-opacity-50"
-            onClick={() => setSidebarOpen(false)}
-          />
+          <div className="flex-1 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />
         </div>
       )}
 
@@ -227,54 +170,30 @@ export default function ChauffeurDashboard() {
           <h2 className="text-2xl font-bold">BATICOM</h2>
         </div>
         <nav className="flex-1 flex flex-col gap-3">
-          {menuItems.map((item) => (
+          {menuItems.map(item => (
             <button
               key={item.key}
               onClick={() => setSection(item.key)}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${
-                section === item.key ? "bg-blue-700" : "hover:bg-blue-800"
-              }`}
+              className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${section === item.key ? "bg-blue-700" : "hover:bg-blue-800"}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
         </nav>
-        <button
-          onClick={handleLogout}
-          className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold"
-        >
-          Déconnexion
-        </button>
       </aside>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col z-0">
-        {/* HEADER */}
         <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative z-10">
           <div className="flex items-center space-x-3">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden text-blue-900">
-              <Menu size={28} />
-            </button>
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden text-blue-900"><Menu size={28} /></button>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-700 font-medium text-sm sm:text-base truncate max-w-[200px] sm:max-w-[250px]">
-              {user?.email}
-            </span>
-            <img
-              src={user?.user_metadata?.avatar || "/default-avatar.png"}
-              alt="Avatar"
-              className="w-10 h-10 rounded-full object-cover cursor-pointer border-2 border-gray-300"
-              onClick={() => setSection("profil")}
-              title="Cliquez pour modifier le profil"
-            />
-          </div>
+          <ProfilUser user={user} setUser={setUser} />
         </header>
 
-        {/* Contenu principal */}
         <div className="flex-1 flex flex-col p-4 sm:p-6">
           {section === "dashboard" && (
             <>
-              {/* Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                 <div className="bg-blue-500 text-white rounded-xl shadow p-4 transform transition hover:scale-105 duration-300">
                   <ClipboardList className="mb-2" size={28} />
@@ -293,16 +212,13 @@ export default function ChauffeurDashboard() {
                 </div>
               </div>
 
-              {/* Carte interactive */}
               <div className="relative z-0 h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mt-6">
                 <MapContainer center={center} zoom={13} className="h-full w-full z-0">
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
-                  {missionsEnCours.length > 0 && (
-                    <ChauffeurTrajet chauffeurId={user.id} />
-                  )}
+                  {positions.length > 0 && <ChauffeurTrajet positions={positions} />}
                 </MapContainer>
               </div>
             </>
@@ -321,35 +237,18 @@ export default function ChauffeurDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {missions.map((m) => (
+                  {missions.map(m => (
                     <tr key={m.id} className="border-b">
                       <td className="py-2 px-4">{m.nom}</td>
                       <td className="py-2 px-4">{m.description}</td>
                       <td className="py-2 px-4">{m.camion_id}</td>
                       <td className="py-2 px-4">{m.statut}</td>
                       <td className="py-2 px-4 flex gap-2">
-                        {m.statut === "a_venir" && (
-                          <button
-                            onClick={() => startMission(m)}
-                            className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 text-sm"
-                          >
-                            Démarrer
-                          </button>
-                        )}
+                        {m.statut === "a_venir" && <button onClick={() => startMission(m)} className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 text-sm">Démarrer</button>}
                         {m.statut === "en_cours" && (
                           <>
-                            <button
-                              onClick={() => { setSelectedMission(m); setShowPanneModal(true); }}
-                              className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
-                            >
-                              Déclarer panne
-                            </button>
-                            <button
-                              onClick={() => finishMission(m)}
-                              className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
-                            >
-                              Terminer
-                            </button>
+                            <button onClick={() => { setSelectedMission(m); setShowPanneModal(true); }} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm">Déclarer panne</button>
+                            <button onClick={() => finishMission(m)} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm">Terminer</button>
                           </>
                         )}
                       </td>
@@ -360,9 +259,7 @@ export default function ChauffeurDashboard() {
             </div>
           )}
 
-          {section === "profil" && (
-            <ProfileSettingsChauffeur user={user} setUser={setUser} />
-          )}
+          {section === "profil" && <ProfilUser user={user} setUser={setUser} />}
         </div>
 
         {/* Modal Panne */}
@@ -371,35 +268,13 @@ export default function ChauffeurDashboard() {
             <div className="bg-white p-4 sm:p-6 rounded w-full max-w-sm sm:max-w-md">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold">Déclarer une panne</h2>
-                <button onClick={() => setShowPanneModal(false)}>
-                  <X />
-                </button>
+                <button onClick={() => setShowPanneModal(false)}><X /></button>
               </div>
               <div className="flex flex-col gap-2">
-                <input
-                  type="text"
-                  placeholder="Type de panne"
-                  value={typePanne}
-                  onChange={(e) => setTypePanne(e.target.value)}
-                  className="w-full p-2 border rounded"
-                />
-                <textarea
-                  placeholder="Description"
-                  value={descriptionPanne}
-                  onChange={(e) => setDescriptionPanne(e.target.value)}
-                  className="w-full p-2 border rounded"
-                />
-                <input
-                  type="file"
-                  onChange={(e) => setPhoto(e.target.files[0])}
-                  className="w-full text-sm"
-                />
-                <button
-                  onClick={declarePanne}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2"
-                >
-                  Envoyer
-                </button>
+                <input type="text" placeholder="Type de panne" value={typePanne} onChange={(e) => setTypePanne(e.target.value)} className="w-full p-2 border rounded" />
+                <textarea placeholder="Description" value={descriptionPanne} onChange={(e) => setDescriptionPanne(e.target.value)} className="w-full p-2 border rounded" />
+                <input type="file" onChange={(e) => setPhoto(e.target.files[0])} className="w-full text-sm" />
+                <button onClick={declarePanne} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2">Envoyer</button>
               </div>
             </div>
           </div>
@@ -410,39 +285,9 @@ export default function ChauffeurDashboard() {
 }
 
 // Composant pour afficher le trajet du chauffeur
-function ChauffeurTrajet({ chauffeurId }) {
-  const [positions, setPositions] = useState([]);
-
-  useEffect(() => {
-    const fetchPositions = async () => {
-      const { data } = await supabase
-        .from("positions")
-        .select("*")
-        .eq("chauffeur_id", chauffeurId)
-        .order("created_at", { ascending: true });
-      setPositions(data || []);
-    };
-    fetchPositions();
-
-    const channel = supabase
-      .channel("chauffeur-positions")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "positions" },
-        (payload) => {
-          if (payload.new.chauffeur_id === chauffeurId) {
-            setPositions((prev) => [...prev, payload.new]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
-  }, [chauffeurId]);
-
+function ChauffeurTrajet({ positions }) {
   if (positions.length === 0) return null;
-
-  const polyline = positions.map((p) => [p.latitude, p.longitude]);
+  const polyline = positions.map(p => [p.latitude, p.longitude]);
   const lastPos = positions[positions.length - 1];
 
   return (
