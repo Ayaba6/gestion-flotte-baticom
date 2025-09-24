@@ -3,7 +3,17 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
 import logoSociete from "../assets/logo.png";
-import { Users, Truck, ClipboardList, Menu, X } from "lucide-react";
+import {
+  Users,
+  Truck,
+  ClipboardList,
+  Wrench,
+  FileWarning,
+  Menu,
+  X,
+  User,
+  LogOut,
+} from "lucide-react";
 
 // Sections
 import UserSection from "../components/UserSection.js";
@@ -23,6 +33,7 @@ export default function AdminDashboard() {
   const [camions, setCamions] = useState([]);
   const [section, setSection] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenu, setProfileMenu] = useState(false);
 
   const center = useMemo(() => [12.37, -1.53], []);
 
@@ -117,12 +128,6 @@ export default function AdminDashboard() {
             </button>
           ))}
         </nav>
-        <button
-          onClick={handleLogout}
-          className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold"
-        >
-          Déconnexion
-        </button>
       </aside>
 
       {/* Sidebar mobile overlay */}
@@ -153,12 +158,6 @@ export default function AdminDashboard() {
                 </button>
               ))}
             </nav>
-            <button
-              onClick={handleLogout}
-              className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold"
-            >
-              Déconnexion
-            </button>
           </aside>
         </div>
       )}
@@ -166,12 +165,42 @@ export default function AdminDashboard() {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         {/* HEADER */}
-        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center">
+        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative">
           <div className="flex items-center space-x-3">
             <button onClick={() => setMenuOpen(true)} className="md:hidden text-blue-900">
               <Menu size={28} />
             </button>
-            <h1 className="text-xl font-bold text-green-700">Admin</h1>
+            <h1 className="text-xl font-bold text-green-700"></h1>
+          </div>
+
+          {/* Profil admin */}
+          <div className="relative">
+            <button
+              onClick={() => setProfileMenu(!profileMenu)}
+              className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200"
+            >
+              <User className="text-blue-900 w-6 h-6" />
+              <span className="hidden sm:inline font-medium text-blue-900">
+                {user?.email}
+              </span>
+            </button>
+
+            {profileMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg overflow-hidden z-50">
+                <div className="px-4 py-2 border-b">
+                  <p className="text-sm text-gray-700 font-medium">
+                    {user?.email}
+                  </p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50"
+                >
+                  <LogOut size={18} />
+                  Déconnexion
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -184,22 +213,49 @@ export default function AdminDashboard() {
                 <CarteFlotte camions={camions} />
               </div>
 
-              {/* Stat cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-blue-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
+              {/* Stat cards cliquables */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div
+                  onClick={() => setSection("users")}
+                  className="bg-blue-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1 cursor-pointer"
+                >
                   <Users className="text-blue-600 w-16 h-16 mb-4" />
                   <h3 className="font-bold text-lg mb-2 text-blue-800">Utilisateurs</h3>
                   <p className="text-blue-700 text-xl">{stats.users}</p>
                 </div>
-                <div className="bg-green-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
+
+                <div
+                  onClick={() => setSection("camions")}
+                  className="bg-green-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1 cursor-pointer"
+                >
                   <Truck className="text-green-600 w-16 h-16 mb-4" />
                   <h3 className="font-bold text-lg mb-2 text-green-800">Véhicules</h3>
                   <p className="text-green-700 text-xl">{stats.camions}</p>
                 </div>
-                <div className="bg-orange-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1">
+
+                <div
+                  onClick={() => setSection("missions")}
+                  className="bg-orange-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1 cursor-pointer"
+                >
                   <ClipboardList className="text-orange-600 w-16 h-16 mb-4" />
                   <h3 className="font-bold text-lg mb-2 text-orange-800">Missions</h3>
                   <p className="text-orange-700 text-xl">{stats.missions}</p>
+                </div>
+
+                <div
+                  onClick={() => setSection("pannes")}
+                  className="bg-red-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1 cursor-pointer"
+                >
+                  <Wrench className="text-red-600 w-16 h-16 mb-4" />
+                  <h3 className="font-bold text-lg mb-2 text-red-800">Alertes Pannes</h3>
+                </div>
+
+                <div
+                  onClick={() => setSection("documents")}
+                  className="bg-purple-50 p-6 rounded-2xl shadow-lg flex flex-col items-center hover:shadow-2xl transition transform hover:-translate-y-1 cursor-pointer"
+                >
+                  <FileWarning className="text-purple-600 w-16 h-16 mb-4" />
+                  <h3 className="font-bold text-lg mb-2 text-purple-800">Alertes Documents</h3>
                 </div>
               </div>
             </>

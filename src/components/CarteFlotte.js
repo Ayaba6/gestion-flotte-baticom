@@ -22,7 +22,11 @@ export default function CarteFlotte({ camions = [], chauffeurs = [] }) {
     .map((c) => [c.latitude, c.longitude]);
 
   return (
-    <MapContainer center={[12.37, -1.53]} zoom={13} className="h-full w-full">
+    <MapContainer
+      center={[12.37, -1.53]}
+      zoom={13}
+      className="h-full w-full relative z-0"   // ✅ empêche la carte de passer au-dessus du menu
+    >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OpenStreetMap contributors"
