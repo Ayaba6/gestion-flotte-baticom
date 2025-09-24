@@ -165,7 +165,7 @@ export default function AdminDashboard() {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         {/* HEADER */}
-        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative">
+        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative z-10">
           <div className="flex items-center space-x-3">
             <button onClick={() => setMenuOpen(true)} className="md:hidden text-blue-900">
               <Menu size={28} />
@@ -188,9 +188,7 @@ export default function AdminDashboard() {
             {profileMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg overflow-hidden z-50">
                 <div className="px-4 py-2 border-b">
-                  <p className="text-sm text-gray-700 font-medium">
-                    {user?.email}
-                  </p>
+                  <p className="text-sm text-gray-700 font-medium">{user?.email}</p>
                 </div>
                 <button
                   onClick={handleLogout}
@@ -209,7 +207,7 @@ export default function AdminDashboard() {
           {section === "dashboard" && (
             <>
               {/* Carte interactive flotte */}
-              <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mb-6">
+              <div className="h-80 sm:h-96 w-full rounded-xl shadow overflow-hidden mb-6 relative z-0">
                 <CarteFlotte camions={camions} />
               </div>
 
