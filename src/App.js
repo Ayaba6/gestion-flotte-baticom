@@ -7,6 +7,8 @@ import Login from "./pages/Login.js";
 import AdminDashboard from "./pages/AdminDashboard.js";
 import SuperviseurDashboard from "./pages/SuperviseurDashboard.js";
 import ChauffeurDashboard from "./pages/ChauffeurDashboard.js";
+import BillingExpenses from "./pages/BillingExpenses.js"; // <-- import de ta page
+
 
 // Admin modules
 import AdminUsers from "./components/AdminUsers.js";
@@ -84,6 +86,17 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+	  
+	  {/* Facture & depenses */}
+      <Route
+        path="/billing"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <BillingExpenses />
+          </ProtectedRoute>
+        }
+      />
+	  
 
       {/* Redirection par défaut */}
       <Route path="*" element={<Navigate to="/login" replace />} />
