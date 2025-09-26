@@ -24,7 +24,12 @@ export default function ExpenseForm({ isOpen, onClose, refresh, camions = [] }) 
 
     setLoading(true);
     const { error } = await supabase.from("expenses").insert([
-      { description, amount: Number(amount), date, camion_id: camionId },
+      {
+        description,
+        amount: Number(amount),
+        date,
+        camion_id: camionId,
+      },
     ]);
     setLoading(false);
 
@@ -69,6 +74,8 @@ export default function ExpenseForm({ isOpen, onClose, refresh, camions = [] }) 
             onChange={(e) => setDate(e.target.value)}
             className="w-full border p-2 rounded"
           />
+
+          {/* Select Camion */}
           <select
             value={camionId}
             onChange={(e) => setCamionId(e.target.value)}
@@ -77,10 +84,12 @@ export default function ExpenseForm({ isOpen, onClose, refresh, camions = [] }) 
             <option value="">Sélectionner un camion</option>
             {camions.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.immatriculation || `Camion ${c.id}`}
+                {c.immatriculation || `Camion ${c.id}`}{" "}
+                {c.modele ? `- ${c.modele}` : ""}
               </option>
             ))}
           </select>
+
           <div className="flex justify-end space-x-2">
             <button
               type="button"

@@ -10,6 +10,7 @@ import { supabase } from "../services/supabaseClient.js";
 export default function BillingExpenses() {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [camions, setCamions] = useState([]); // ✅ ajouter camions
   const [totals, setTotals] = useState({ invoices: 0, expenses: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -22,12 +23,20 @@ export default function BillingExpenses() {
     try {
       const { data: inv } = await supabase.from("invoices").select("*");
       const { data: exp } = await supabase.from("expenses").select("*");
+      const { data: veh, error: vehError } = await supabase
+        .from("camions")
+        .select("id, immatriculation"); // ✅ récupération des camions
+
+      if (vehError) {
+        console.error("Erreur fetch camions:", vehError);
+      }
 
       const invData = inv || [];
       const expData = exp || [];
 
       setInvoices(invData);
       setExpenses(expData);
+      setCamions(veh || []); // ✅ maj des camions
 
       const totalInvoices = invData.reduce((acc, f) => acc + Number(f?.amount || 0), 0);
       const totalExpenses = expData.reduce((acc, d) => acc + Number(d?.amount || 0), 0);
@@ -56,26 +65,47 @@ export default function BillingExpenses() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white shadow rounded-xl p-6 border">
           <h3 className="text-gray-500 text-sm">Total Factures</h3>
-          <p className="text-2xl font-bold text-green-600">{totals.invoices.toLocaleString()} FCFA</p>
+          <p className="text-2xl font-bold text-green-600">
+            {totals.invoices.toLocaleString()} FCFA
+          </p>
         </div>
         <div className="bg-white shadow rounded-xl p-6 border">
           <h3 className="text-gray-500 text-sm">Total Dépenses</h3>
-          <p className="text-2xl font-bold text-red-600">{totals.expenses.toLocaleString()} FCFA</p>
+          <p className="text-2xl font-bold text-red-600">
+            {totals.expenses.toLocaleString()} FCFA
+          </p>
         </div>
         <div className="bg-white shadow rounded-xl p-6 border">
           <h3 className="text-gray-500 text-sm">Solde Net</h3>
-          <p className={`text-2xl font-bold ${totals.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+          <p
+            className={`text-2xl font-bold ${
+              totals.balance >= 0 ? "text-blue-600" : "text-red-600"
+            }`}
+          >
             {totals.balance.toLocaleString()} FCFA
           </p>
         </div>
       </div>
 
       {/* Graphique */}
-      {loading ? <p>Chargement des graphiques...</p> : <FinanceChart invoices={invoices} expenses={expenses} />}
+      {loading ? (
+        <p>Chargement des graphiques...</p>
+      ) : (
+        <FinanceChart invoices={invoices} expenses={expenses} />
+      )}
 
       {/* Modals */}
-      <InvoiceForm isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} refresh={fetchData} />
-      <ExpenseForm isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} refresh={fetchData} camions={[]} />
+      <InvoiceForm
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        refresh={fetchData}
+      />
+      <ExpenseForm
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        refresh={fetchData}
+        camions={camions} // ✅ passer la liste ici
+      />
 
       {/* Tabs Factures / Dépenses */}
       <Tabs
@@ -85,7 +115,11 @@ export default function BillingExpenses() {
             label: "Factures",
             value: "invoices",
             content: invoices.length ? (
-              <InvoicesList invoices={invoices} refresh={fetchData} onAdd={() => setIsInvoiceModalOpen(true)} />
+              <InvoicesList
+                invoices={invoices}
+                refresh={fetchData}
+                onAdd={() => setIsInvoiceModalOpen(true)}
+              />
             ) : (
               <p>Aucune facture disponible.</p>
             ),
@@ -94,7 +128,11 @@ export default function BillingExpenses() {
             label: "Dépenses",
             value: "expenses",
             content: expenses.length ? (
-              <ExpensesList expenses={expenses} refresh={fetchData} onAdd={() => setIsExpenseModalOpen(true)} />
+              <ExpensesList
+                expenses={expenses}
+                refresh={fetchData}
+                onAdd={() => setIsExpenseModalOpen(true)}
+              />
             ) : (
               <p>Aucune dépense disponible.</p>
             ),
