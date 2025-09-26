@@ -1,35 +1,34 @@
 import React, { useState } from "react";
 
-/**
- * Tabs component simple
- * Props:
- * - tabs: array d'objets { label: string, value: string, content: JSX.Element }
- */
-export default function Tabs({ tabs, defaultValue }) {
-  const [activeTab, setActiveTab] = useState(defaultValue || tabs[0]?.value);
+export default function Tabs({ tabs = [], defaultValue }) {
+  const [activeTab, setActiveTab] = useState(defaultValue || (tabs[0]?.value || null));
+
+  if (!Array.isArray(tabs) || tabs.length === 0) return null;
 
   return (
-    <div>
-      {/* Boutons d'onglets */}
-      <div className="flex gap-2 border-b mb-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            className={`px-4 py-2 font-medium rounded-t ${
-              activeTab === tab.value
-                ? "bg-blue-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div className="flex border-b border-gray-200">
+        {(tabs || []).map((tab, idx) =>
+          tab ? (
+            <button
+              key={tab.value || idx}
+              onClick={() => setActiveTab(tab.value)}
+              className={`px-4 py-2 -mb-px font-medium text-sm rounded-t-md ${
+                activeTab === tab.value
+                  ? "border-b-2 border-blue-600 text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label || ""}
+            </button>
+          ) : null
+        )}
       </div>
 
-      {/* Contenu actif */}
-      <div className="p-4 border rounded-b bg-white">
-        {tabs.find((tab) => tab.value === activeTab)?.content}
+      <div className="p-4 bg-white rounded-b-md shadow border">
+        {(tabs || []).map((tab, idx) =>
+          tab && tab.value === activeTab ? <div key={tab.value || idx}>{tab.content || null}</div> : null
+        )}
       </div>
     </div>
   );

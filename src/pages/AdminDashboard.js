@@ -25,6 +25,9 @@ import AlertesExpiration from "../components/AlertesExpiration.js";
 // Carte flotte
 import CarteFlotte from "../components/CarteFlotte.js";
 
+// Billing
+import BillingExpenses from "./BillingExpenses.js";
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -105,6 +108,7 @@ export default function AdminDashboard() {
     { key: "missions", label: "Missions" },
     { key: "pannes", label: "Alertes Pannes" },
     { key: "documents", label: "Alertes Documents" },
+    { key: "billing", label: "Facturation & Dépenses" },
   ];
 
   return (
@@ -180,9 +184,7 @@ export default function AdminDashboard() {
               className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200"
             >
               <User className="text-blue-900 w-6 h-6" />
-              <span className="hidden sm:inline font-medium text-blue-900">
-                {user?.email}
-              </span>
+              <span className="hidden sm:inline font-medium text-blue-900">{user?.email}</span>
             </button>
 
             {profileMenu && (
@@ -264,6 +266,7 @@ export default function AdminDashboard() {
           {section === "missions" && <MissionsSection />}
           {section === "pannes" && <PannesDeclarees />}
           {section === "documents" && <AlertesExpiration />}
+          {section === "billing" && <BillingExpenses />}
         </div>
       </div>
     </div>
