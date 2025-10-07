@@ -1,135 +1,241 @@
 // src/components/billing/InvoiceForm.js
-import React, { useState } from "react";
-import { supabase } from "../../services/supabaseClient.js";
-import { X, FileText, Loader2, DollarSign, User, Calendar } from "lucide-react";
-import { toast } from "react-hot-toast"; // Assurez-vous d'avoir installé et configuré react-hot-toast
+import React, { useState, useEffect } from "react";
+import { X, FileText } from "lucide-react";
+import { generateInvoicePDF } from "./InvoiceGenerator.js";
+import SummaryTableModal from "./SummaryTableModal.js";
+import ItemsTableModal from "./ItemsTableModal.js";
+import { Button } from "../ui/button.js";
 
-export default function InvoiceForm({ isOpen, onClose, refresh }) {
-    const [clientName, setClientName] = useState("");
-    const [amount, setAmount] = useState("");
-    const [dueDate, setDueDate] = useState("");
-    const [loading, setLoading] = useState(false);
+export default function InvoiceForm({ isOpen, onClose }) {
+  // Infos facture
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [clientRCCM, setClientRCCM] = useState("");
+  const [clientIFU, setClientIFU] = useState("");
+  const [clientTel, setClientTel] = useState("");
+  const [objet, setObjet] = useState("");
+  const [periode, setPeriode] = useState("");
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (!clientName || !amount || !dueDate) {
-            toast.error("Veuillez remplir tous les champs obligatoires.");
-            return;
-        }
-        if (isNaN(Number(amount)) || Number(amount) <= 0) {
-            toast.error("Le montant doit être un nombre positif.");
-            return;
-        }
+  // Données des tableaux
+  const [summaryData, setSummaryData] = useState([]);
+  const [itemsData, setItemsData] = useState([]);
 
-        setLoading(true);
-        
-        const { error } = await supabase.from("invoices").insert([
-            { client_name: clientName, amount: Number(amount), due_date: dueDate, status: "en_attente" } // Utilisation du statut 'en_attente' cohérent
-        ]);
+  // Modals des tableaux
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
 
-        setLoading(false);
+  // URL PDF pour prévisualisation
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
 
-        if (error) {
-            console.error("Erreur lors de l'ajout:", error);
-            toast.error("Erreur lors de l'ajout de la facture: " + error.message);
-        } else {
-            // Réinitialisation du formulaire
-            setClientName("");
-            setAmount("");
-            setDueDate("");
-            
-            toast.success(`Facture pour ${clientName} ajoutée avec succès!`);
-            onClose();
-            refresh(); // rafraîchir la liste
-        }
+  // --- HOOK DE GÉNÉRATION PDF ---
+  useEffect(() => {
+    if (!isOpen) return; // On ne fait rien si modal fermé
+    if (invoiceNumber || clientName || summaryData.length || itemsData.length) {
+      const invoiceData = {
+        invoiceNumber,
+        clientName,
+        clientAddress,
+        clientRCCM,
+        clientIFU,
+        clientTel,
+        objet,
+        periode,
+        summaryData,
+        itemsData,
+      };
+      const doc = generateInvoicePDF(invoiceData);
+      const pdfBlob = doc.output("blob");
+      const url = URL.createObjectURL(pdfBlob);
+      setPdfBlobUrl(url);
+    }
+  }, [
+    isOpen,
+    invoiceNumber,
+    clientName,
+    clientAddress,
+    clientRCCM,
+    clientIFU,
+    clientTel,
+    objet,
+    periode,
+    summaryData,
+    itemsData,
+  ]);
+
+  if (!isOpen) return null;
+
+  const handleGeneratePDF = () => {
+    const invoiceData = {
+      invoiceNumber,
+      clientName,
+      clientAddress,
+      clientRCCM,
+      clientIFU,
+      clientTel,
+      objet,
+      periode,
+      summaryData,
+      itemsData,
     };
+    const doc = generateInvoicePDF(invoiceData);
+    doc.save(`${invoiceNumber || "facture"}.pdf`);
+  };
 
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 transition-opacity duration-300">
-            <div className="bg-white p-8 rounded-2xl w-full max-w-lg relative shadow-2xl transform transition-transform duration-300 scale-100">
-                
-                {/* Bouton de fermeture */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition"
-                    aria-label="Fermer"
-                >
-                    <X size={24} />
-                </button>
-                
-                {/* Titre */}
-                <div className="flex items-center gap-3 mb-6 border-b pb-3">
-                    <FileText size={28} className="text-green-600" />
-                    <h2 className="text-2xl font-bold text-gray-800">Ajouter une nouvelle facture</h2>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    
-                    {/* Nom du client */}
-                    <div className="relative">
-                        <User size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Nom du client (obligatoire)"
-                            value={clientName}
-                            onChange={(e) => setClientName(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition"
-                            required
-                        />
-                    </div>
-                    
-                    {/* Montant */}
-                    <div className="relative">
-                        <DollarSign size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="number"
-                            placeholder="Montant (FCFA)"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition"
-                            min="1"
-                            required
-                        />
-                    </div>
-                    
-                    {/* Date d'échéance */}
-                    <div className="relative">
-                        <Calendar size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="date"
-                            value={dueDate}
-                            onChange={(e) => setDueDate(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition"
-                            required
-                        />
-                    </div>
-                    
-                    {/* Boutons d'action */}
-                    <div className="flex justify-end pt-2 space-x-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? (
-                                <><Loader2 size={18} className="animate-spin" /> Enregistrement...</>
-                            ) : (
-                                "Enregistrer la facture"
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh]">
+        {/* En-tête */}
+        <div className="flex justify-between items-center border-b pb-3 mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-800">
+            <FileText className="text-blue-600" /> Nouvelle Facture
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-red-500">
+            <X size={22} />
+          </button>
         </div>
-    );
+
+        {/* Formulaire */}
+        <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Numéro de facture</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder="Ex: N001-08/BAT/2025"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Nom du client</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Ex: ETS NAABISSIS"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Adresse complète</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="Ex: 07 BP 5710 OUAGADOUGOU 07"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600">RCCM</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={clientRCCM}
+                onChange={(e) => setClientRCCM(e.target.value)}
+                placeholder="Ex: BF OUA 01 2023 AIO 04307"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600">IFU</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={clientIFU}
+                onChange={(e) => setClientIFU(e.target.value)}
+                placeholder="Ex: 00200091L"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Téléphone</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={clientTel}
+                onChange={(e) => setClientTel(e.target.value)}
+                placeholder="Ex: 76 11 04 21 / 70 54 09 55"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600">Objet</label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded-md"
+              value={objet}
+              onChange={(e) => setObjet(e.target.value)}
+              placeholder="Ex: Transport de Minerai Ore"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600">Période</label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded-md"
+              value={periode}
+              onChange={(e) => setPeriode(e.target.value)}
+              placeholder="Ex: 26/07/2025 au 25/08/2025"
+            />
+          </div>
+
+          {/* Boutons modals */}
+          <div className="flex flex-wrap gap-3 pt-3">
+            <button
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Remplir Tableau Résumé
+            </button>
+            <button
+              onClick={() => setIsItemsModalOpen(true)}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+            >
+              Remplir Tableau Détails
+            </button>
+          </div>
+        </div>
+
+        {/* Bouton génération PDF */}
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
+            onClick={handleGeneratePDF}
+            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
+          >
+            Générer le PDF
+          </Button>
+          {pdfBlobUrl && (
+            <a
+              href={pdfBlobUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+            >
+              Aperçu PDF
+            </a>
+          )}
+        </div>
+
+        {/* Modals */}
+        <SummaryTableModal
+          isOpen={isSummaryModalOpen}
+          onClose={() => setIsSummaryModalOpen(false)}
+          onUpdate={setSummaryData}
+        />
+        <ItemsTableModal
+          isOpen={isItemsModalOpen}
+          onClose={() => setIsItemsModalOpen(false)}
+          onUpdate={setItemsData}
+        />
+      </div>
+    </div>
+  );
 }
