@@ -3,13 +3,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ======================================================= */
+/* ====== 1. ANIMATION DYNAMIQUE POUR LE LOGIN PAGE ====== */
+/* ======================================================= */
+
+/* Animation de pulsation des lignes de connexion (Effet Pro) */
+@keyframes line-pulse {
+  0%, 100% {
+    transform: scaleY(0.1);
+    opacity: 0.1;
+  }
+  50% { 
+    transform: scaleY(1.5); /* S'étire pour un effet de pulsation */
+    opacity: 0.8; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6); /* Effet lumineux */
+  }
+}
+
+.animate-line-pulse {
+  animation: line-pulse 4s infinite ease-in-out alternate;
+}
+
+/* Animation de changement de couleur (pour une lueur subtile) */
+@keyframes hue-shift {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
+
+.animate-hue-shift {
+    animation: hue-shift 15s infinite linear;
+}
+
+/* Utilitaires CSS personnalisés */
+.bg-radial-gradient {
+    /* Crée une lueur douce au centre de la zone de marque */
+    background: radial-gradient(circle at center, #38e888 0%, transparent 70%);
+}
+
+
+/* ======================================================= */
+/* ====== 2. CLEANUP ET STYLES DE BASE (inchangés) ======= */
+/* ======================================================= */
 
 /* ===== Reset et base ===== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif; 
 }
 
 body {
@@ -18,7 +59,7 @@ body {
   line-height: 1.6;
 }
 
-/* ===== Conteneur et formulaires ===== */
+/* ===== Conteneur et formulaires (Laisser pour les autres pages) ===== */
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -33,7 +74,13 @@ textarea {
   font-size: 1rem;
 }
 
-/* ===== Formulaire Login ===== */
+/* * NOTE IMPORTANTE :
+ * Les styles CSS classiques ci-dessous pour le login (.login-wrapper, .login-card, etc.)
+ * devraient être retirés, car ils sont gérés par les classes Tailwind dans Login.js. 
+ * Je les laisse pour l'instant par précaution, mais gardez cette modification en tête.
+*/
+
+/* Styles obsolètes pour le Login (à retirer) */
 .login-wrapper {
   display: flex;
   justify-content: center;
@@ -101,7 +148,7 @@ textarea {
   font-size: 0.9rem;
 }
 
-/* ===== Tables responsive ===== */
+/* ===== Tables responsive (inchangées) ===== */
 .table-container {
   width: 100%;
   overflow-x: auto;

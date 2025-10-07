@@ -2,6 +2,11 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
+// FONCTIONS UTILITAIRES DEJA EXISTANTES...
+// ... (Dialog, DialogTrigger, DialogPortal, DialogClose)
+// ... (DialogOverlay, DialogContent, DialogHeader)
+// ... (DialogTitle, DialogDescription)
+
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogPortal = DialogPrimitive.Portal;
@@ -63,3 +68,13 @@ export const DialogDescription = React.forwardRef(
 );
 
 DialogDescription.displayName = "DialogDescription";
+
+// NOUVEL EXPORT AJOUTÉ POUR CORRIGER L'ERREUR
+// ------------------------------------------
+export const DialogFooter = ({ className, ...props }) => (
+  <div
+    className={`flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4 ${className}`}
+    {...props}
+  />
+);
+// ------------------------------------------
