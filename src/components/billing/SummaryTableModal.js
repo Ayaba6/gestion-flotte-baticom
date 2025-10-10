@@ -1,20 +1,37 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Plus } from "lucide-react";
 import { Button } from "../ui/button.js";
 
 export default function SummaryTableModal({ isOpen, onClose, onUpdate }) {
   const [rows, setRows] = useState([{ label: "", amount: "" }]);
+  const [total, setTotal] = useState(0);
+
+  // --- Calcul automatique du total ---
+  useEffect(() => {
+    const sum = rows.reduce((acc, row) => acc + (Number(row.amount) || 0), 0);
+    setTotal(sum);
+  }, [rows]);
 
   if (!isOpen) return null;
 
   const handleAddRow = () => setRows([...rows, { label: "", amount: "" }]);
+
   const handleChange = (idx, field, value) => {
     const newRows = [...rows];
     newRows[idx][field] = value;
     setRows(newRows);
   };
+
   const handleSave = () => {
-    onUpdate(rows.map(r => ({ label: r.label, amount: Number(r.amount) || 0 })));
+    // Ajout d'une ligne TOTAL à la fin
+    const updatedRows = [...rows, { label: "TOTAL HTVA", amount: total }];
+    // On envoie la valeur numérique propre au parent
+    onUpdate(
+      updatedRows.map((r) => ({
+        label: r.label,
+        amount: Number(r.amount) || 0,
+      }))
+    );
     onClose();
   };
 
@@ -38,24 +55,34 @@ export default function SummaryTableModal({ isOpen, onClose, onUpdate }) {
                 className="flex-1 p-2 border rounded-md"
                 placeholder="Libellé"
                 value={row.label}
-                onChange={e => handleChange(idx, "label", e.target.value)}
+                onChange={(e) => handleChange(idx, "label", e.target.value)}
               />
               <input
-                type="number"
+                type="text" // texte pour permettre les espaces insécables
                 className="w-32 p-2 border rounded-md"
                 placeholder="Montant"
-                value={row.amount}
-                onChange={e => handleChange(idx, "amount", e.target.value)}
+                value={row.amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F")} // formatage en temps réel
+                onChange={(e) => handleChange(idx, "amount", e.target.value.replace(/\u202F/g, ""))}
               />
             </div>
           ))}
         </div>
 
-        <div className="flex justify-between mt-4">
-          <button onClick={handleAddRow} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-            Ajouter ligne
-          </button>
-          <Button onClick={handleSave} className="bg-blue-600 text-white">Enregistrer</Button>
+        <div className="flex justify-between mt-4 items-center">
+          <span className="text-gray-700 font-semibold">
+            Total HTVA: {total.toLocaleString("fr-FR")}
+          </span>
+          <div>
+            <button
+              onClick={handleAddRow}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Ajouter ligne
+            </button>
+            <Button onClick={handleSave} className="bg-blue-600 text-white ml-2">
+              Enregistrer
+            </Button>
+          </div>
         </div>
       </div>
     </div>

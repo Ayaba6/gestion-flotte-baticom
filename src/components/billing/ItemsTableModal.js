@@ -7,23 +7,36 @@ export default function ItemsTableModal({ isOpen, onClose, onUpdate }) {
 
   if (!isOpen) return null;
 
-  const handleAddRow = () => setRows([...rows, { description: "", unitPrice: "", quantity: "", total: "" }]);
+  const handleAddRow = () =>
+    setRows([...rows, { description: "", unitPrice: "", quantity: "", total: "" }]);
+
   const handleChange = (idx, field, value) => {
     const newRows = [...rows];
+
+    // Valeurs numériques
+    if (field === "unitPrice" || field === "quantity") {
+      // Retirer les espaces ou caractères non numériques
+      value = value.replace(/[^0-9.]/g, "");
+    }
+
     newRows[idx][field] = value;
+
     const price = Number(newRows[idx].unitPrice) || 0;
     const qty = Number(newRows[idx].quantity) || 0;
     newRows[idx].total = price * qty;
+
     setRows(newRows);
   };
 
   const handleSave = () => {
-    onUpdate(rows.map(r => ({
-      description: r.description,
-      unitPrice: Number(r.unitPrice) || 0,
-      quantity: Number(r.quantity) || 0,
-      total: Number(r.total) || 0
-    })));
+    onUpdate(
+      rows.map((r) => ({
+        description: r.description,
+        unitPrice: Number(r.unitPrice) || 0,
+        quantity: Number(r.quantity) || 0,
+        total: Number(r.total) || 0,
+      }))
+    );
     onClose();
   };
 
@@ -47,27 +60,27 @@ export default function ItemsTableModal({ isOpen, onClose, onUpdate }) {
                 className="p-2 border rounded-md col-span-2"
                 placeholder="Description"
                 value={row.description}
-                onChange={e => handleChange(idx, "description", e.target.value)}
+                onChange={(e) => handleChange(idx, "description", e.target.value)}
               />
               <input
                 type="number"
                 className="p-2 border rounded-md"
                 placeholder="PU"
                 value={row.unitPrice}
-                onChange={e => handleChange(idx, "unitPrice", e.target.value)}
+                onChange={(e) => handleChange(idx, "unitPrice", e.target.value)}
               />
               <input
                 type="number"
                 className="p-2 border rounded-md"
                 placeholder="Qté"
                 value={row.quantity}
-                onChange={e => handleChange(idx, "quantity", e.target.value)}
+                onChange={(e) => handleChange(idx, "quantity", e.target.value)}
               />
               <input
-                type="number"
+                type="text"
                 className="p-2 border rounded-md bg-gray-100"
                 placeholder="Total"
-                value={row.total}
+                value={row.total.toLocaleString("fr-FR")}
                 readOnly
               />
             </div>
@@ -75,10 +88,15 @@ export default function ItemsTableModal({ isOpen, onClose, onUpdate }) {
         </div>
 
         <div className="flex justify-between mt-4">
-          <button onClick={handleAddRow} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+          <button
+            onClick={handleAddRow}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
             Ajouter ligne
           </button>
-          <Button onClick={handleSave} className="bg-blue-600 text-white">Enregistrer</Button>
+          <Button onClick={handleSave} className="bg-blue-600 text-white">
+            Enregistrer
+          </Button>
         </div>
       </div>
     </div>

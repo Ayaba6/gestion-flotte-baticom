@@ -1,18 +1,46 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient.js";
-import { Truck, User, Plus, Check, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/button.js";
-import MissionForm from './MissionForm.js'; // <-- IMPORT DU FORMULAIRE SÉPARÉ
+import { Card, CardHeader } from "../components/ui/card.js";
+import { useToast } from "../components/ui/use-toast.js";
+import ConfirmDialog from "../components/ui/ConfirmDialog.js";
+import MissionModal from "./MissionModal.js";
+import { Pencil, Trash2, Truck, Check, FileText, File } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// Badge pour le statut
+const getStatusBadge = (statut) => {
+  const colors = {
+    a_venir: "bg-yellow-100 text-yellow-800",
+    en_cours: "bg-blue-100 text-blue-800",
+    terminee: "bg-green-100 text-green-800"
+  };
+  const labels = {
+    a_venir: "À venir",
+    en_cours: "En cours",
+    terminee: "Terminée"
+  };
+  return <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[statut] || "bg-gray-100 text-gray-800"}`}>{labels[statut] || statut}</span>;
+};
 
 export default function MissionsSection() {
+  const { toast } = useToast();
+
   const [missions, setMissions] = useState([]);
   const [chauffeurs, setChauffeurs] = useState([]);
   const [camions, setCamions] = useState([]);
-  const [remorques, setRemorques] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingMission, setEditingMission] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [missionToDelete, setMissionToDelete] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatut, setFilterStatut] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
-  // Champs formulaire (maintenus ici pour la logique de sauvegarde)
+  // Champs pour le modal
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [depart, setDepart] = useState("");
@@ -21,104 +49,29 @@ export default function MissionsSection() {
   const [camionId, setCamionId] = useState("");
   const [remorqueId, setRemorqueId] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatut, setFilterStatut] = useState("toutes");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
-
-  // 🔹 Charger données (unchanged)
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: usersData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("role", "chauffeur");
-        const { data: camionsData } = await supabase.from("camions").select("*");
-        const { data: remorquesData } = await supabase.from("remorques").select("*");
-        const { data: missionsData } = await supabase.from("missions").select("*");
-
-        setChauffeurs(usersData || []);
-        setCamions(camionsData || []);
-        setRemorques(remorquesData || []);
-        setMissions(missionsData || []);
-      } catch (err) {
-        console.error("Erreur chargement missions:", err);
-      }
-    };
-    fetchData();
-  }, []);
-
-  // 🔹 Fonction de réinitialisation des champs du formulaire
-  const resetForm = () => {
-    setTitre(""); 
-    setDescription(""); 
-    setDepart(""); 
-    setDestination("");
-    setChauffeurId(""); 
-    setCamionId(""); 
-    setRemorqueId("");
-    setEditingMission(null); 
-    setShowForm(false);
-  }
-
-  // 🔹 Ajouter ou modifier une mission (unchanged)
-  const saveMission = async () => {
-    if (!titre || !description || !depart || !destination || !chauffeurId || !camionId) {
-      alert("Veuillez remplir tous les champs obligatoires");
-      return;
-    }
-
-    const enCours = missions.find(
-      (m) =>
-        (m.chauffeur_id === chauffeurId || m.camion_id === camionId) &&
-        m.statut !== "terminee" &&
-        (!editingMission || m.id !== editingMission.id)
-    );
-    if (enCours) {
-      alert("Le chauffeur ou le camion est déjà assigné à une mission active !");
-      return;
-    }
-
+  // 🔄 Charger les données
+  const fetchData = useCallback(async () => {
     try {
-      const missionData = {
-        titre,
-        description,
-        depart,
-        destination,
-        chauffeur_id: chauffeurId,
-        camion_id: camionId,
-        remorque_id: remorqueId || null,
-        statut: editingMission ? editingMission.statut : "a_venir", // Conserver le statut existant ou mettre "a_venir"
-      };
+      const { data: usersData } = await supabase.from("users").select("*").eq("role", "chauffeur");
+      const { data: camionsData } = await supabase.from("camions").select("*");
+      const { data: missionsData } = await supabase.from("missions").select("*").order("created_at", { ascending: false });
 
-      if (editingMission) {
-        const { error } = await supabase
-          .from("missions")
-          .update(missionData)
-          .eq("id", editingMission.id);
-        if (error) throw error;
-
-        setMissions((prev) =>
-          prev.map((m) =>
-            m.id === editingMission.id ? { ...m, ...missionData } : m
-          )
-        );
-      } else {
-        const { data, error } = await supabase.from("missions").insert([missionData]).select();
-        if (error) throw error;
-        setMissions((prev) => [...prev, ...(data || [])]);
-      }
-
-      resetForm(); // Appel de la fonction de réinitialisation
+      setChauffeurs(usersData || []);
+      setCamions(camionsData || []);
+      setMissions(missionsData || []);
     } catch (err) {
-      console.error(err);
-      alert("Erreur lors de la sauvegarde de la mission.");
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
     }
+  }, [toast]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleAdd = () => {
+    setEditingMission(null);
+    setShowModal(true);
   };
 
-  // 🔹 Préparer l'édition d'une mission
-  const prepareEdit = (mission) => {
+  const handleEdit = (mission) => {
     setEditingMission(mission);
     setTitre(mission.titre);
     setDescription(mission.description);
@@ -127,210 +80,206 @@ export default function MissionsSection() {
     setChauffeurId(mission.chauffeur_id);
     setCamionId(mission.camion_id);
     setRemorqueId(mission.remorque_id || "");
-    setShowForm(true);
+    setShowModal(true);
   };
 
-
-  // 🔹 Terminer mission (unchanged)
-  const terminerMission = async (missionId) => {
+  const confirmDelete = async () => {
     try {
-      await supabase.from("missions").update({ statut: "terminee" }).eq("id", missionId);
-      setMissions((prev) =>
-        prev.map((m) => (m.id === missionId ? { ...m, statut: "terminee" } : m))
-      );
-    } catch (err) { console.error(err); }
-  };
-
-  // 🔹 Supprimer mission (unchanged)
-  const supprimerMission = async (id) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer cette mission ?")) return;
-    try {
-      await supabase.from("missions").delete().eq("id", id);
-      setMissions((prev) => prev.filter((m) => m.id !== id));
-    } catch (err) { console.error(err); }
-  };
-
-  // 🔹 Filtrage et recherche (unchanged)
-  const filteredMissions = missions.filter((m) => {
-    const chauffeur = chauffeurs.find((c) => c.id === m.chauffeur_id);
-    const camion = camions.find((c) => c.id === m.camion_id);
-    const remorque = remorques.find((r) => r.id === m.remorque_id);
-
-    const matchesSearch =
-      (m.titre?.toLowerCase() ?? "").includes(searchTerm.toLowerCase()) ||
-      (m.description?.toLowerCase() ?? "").includes(searchTerm.toLowerCase()) ||
-      (m.depart?.toLowerCase() ?? "").includes(searchTerm.toLowerCase()) ||
-      (m.destination?.toLowerCase() ?? "").includes(searchTerm.toLowerCase()) ||
-      (chauffeur?.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (camion?.immatriculation ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (remorque?.immatriculation ?? "").toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesFilter = filterStatut === "toutes" ? true : m.statut === filterStatut;
-    return matchesSearch && matchesFilter;
-  });
-
-  const totalPages = Math.ceil(filteredMissions.length / itemsPerPage);
-  const paginatedMissions = filteredMissions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const renderStatut = (statut) => {
-    switch (statut) {
-      case "a_venir": return <span className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">À venir</span>;
-      case "en_cours": return <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded-full text-sm font-medium">En cours</span>;
-      case "terminee": return <span className="flex items-center gap-1 px-2 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium"><Check size={14} /> Terminée</span>;
-      default: return statut;
+      await supabase.from("missions").delete().eq("id", missionToDelete.id);
+      toast({ title: "Mission supprimée", description: `"${missionToDelete.titre}" a été supprimée.` });
+      setMissionToDelete(null);
+      setConfirmOpen(false);
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
     }
   };
 
-  // Détermine le type de camion sélectionné pour le passer au formulaire
-  const selectedCamionType = camions.find((c) => c.id === camionId)?.type;
+  // Filtrage
+  const filteredMissions = missions.filter(m => {
+    const chauffeur = chauffeurs.find(c => c.id === m.chauffeur_id);
+    const camion = camions.find(c => c.id === m.camion_id);
+    return (m.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            chauffeur?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            camion?.immatriculation?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            (filterStatut === "" || m.statut === filterStatut);
+  });
+
+  const totalPages = Math.ceil(filteredMissions.length / ITEMS_PER_PAGE);
+  const paginatedMissions = filteredMissions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Export Excel
+  const exportExcel = () => {
+    const wsData = filteredMissions.map(m => {
+      const camion = camions.find(c => c.id === m.camion_id);
+      const remorque = m.remorque_id ? camions.find(c => c.id === m.remorque_id) : null;
+      return {
+        Titre: m.titre,
+        Chauffeur: chauffeurs.find(c => c.id === m.chauffeur_id)?.name || "",
+        Camion: camion?.immatriculation || "",
+        Remorque: remorque?.immatriculation || "",
+        Départ: m.depart,
+        Destination: m.destination,
+        Statut: m.statut
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Missions");
+    XLSX.writeFile(wb, "missions.xlsx");
+    toast({ title: "Export Excel", description: "Fichier généré" });
+  };
+
+  // Export PDF
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text("Liste des Missions", 14, 20);
+    autoTable(doc, {
+      startY: 30,
+      head: [["Titre", "Chauffeur", "Camion", "Remorque", "Départ", "Destination", "Statut"]],
+      body: filteredMissions.map(m => {
+        const camion = camions.find(c => c.id === m.camion_id);
+        const remorque = m.remorque_id ? camions.find(c => c.id === m.remorque_id) : null;
+        return [
+          m.titre,
+          chauffeurs.find(c => c.id === m.chauffeur_id)?.name || "",
+          camion?.immatriculation || "",
+          remorque?.immatriculation || "",
+          m.depart, m.destination, m.statut
+        ];
+      }),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [240,240,240] }
+    });
+    doc.save("missions.pdf");
+    toast({ title: "Export PDF", description: "Fichier généré" });
+  };
+
+  const terminerMission = async (m) => {
+    try {
+      await supabase.from("missions").update({ statut: "terminee" }).eq("id", m.id);
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Missions</h2>
-        <Button 
-          onClick={() => { 
-            if (showForm && !editingMission) {
-                setShowForm(false); // Masquer si déjà ouvert et mode ajout
-            } else {
-                setShowForm(true); 
-                setEditingMission(null); // S'assurer que le mode est "ajout"
-                // On pourrait aussi réinitialiser les champs ici si on le souhaite
-            }
-          }}
-        >
-          <Plus size={18} className="mr-2" /> Nouvelle mission
-        </Button>
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <Card className="shadow-xl bg-white/90 border border-gray-200">
+        <CardHeader className="flex justify-between items-center p-4 sm:p-6">
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            <Truck size={24} className="text-blue-600"/> Missions
+          </h2>
+          <Button onClick={handleAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+            + Nouvelle mission
+          </Button>
+        </CardHeader>
+      </Card>
+
+      {/* Recherche + filtres + exports */}
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-white p-4 rounded-xl shadow border border-gray-100">
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            type="text"
+            placeholder="🔍 Rechercher..."
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            className="w-full sm:w-64 border-gray-300 rounded px-2 py-1"
+          />
+          <select
+            value={filterStatut}
+            onChange={e => { setFilterStatut(e.target.value); setCurrentPage(1); }}
+            className="w-full sm:w-36 border rounded px-2 py-1"
+          >
+            <option value="">Tous statuts</option>
+            <option value="a_venir">À venir</option>
+            <option value="en_cours">En cours</option>
+            <option value="terminee">Terminée</option>
+          </select>
+        </div>
+        <div className="flex gap-2 justify-end w-full md:w-auto mt-2 md:mt-0">
+          <Button onClick={exportExcel} variant="outline" className="flex items-center gap-1 border-green-500 text-green-600 hover:bg-green-50"><File size={16}/> Excel</Button>
+          <Button onClick={exportPDF} variant="outline" className="flex items-center gap-1 border-red-500 text-red-600 hover:bg-red-50"><FileText size={16}/> PDF</Button>
+        </div>
       </div>
 
-      {/* APPEL DU FORMULAIRE SÉPARÉ */}
-      {showForm && (
-        <MissionForm
-          // Les états et leurs setters
-          titre={titre} setTitre={setTitre}
-          description={description} setDescription={setDescription}
-          depart={depart} setDepart={setDepart}
-          destination={destination} setDestination={setDestination}
-          chauffeurId={chauffeurId} setChauffeurId={setChauffeurId}
-          camionId={camionId} setCamionId={setCamionId}
-          remorqueId={remorqueId} setRemorqueId={setRemorqueId}
-          
-          // Les données pour les listes déroulantes
-          chauffeurs={chauffeurs}
-          camions={camions}
-          remorques={remorques}
-          
-          // La fonction de sauvegarde et l'état d'édition
-          saveMission={saveMission}
-          editingMission={editingMission}
-          
-          // Le type de camion sélectionné pour la logique de remorque
-          selectedCamionType={selectedCamionType}
-        />
-      )}
-      
-      {/* CONTRÔLES DE RECHERCHE ET FILTRE */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6 flex space-x-4 items-center">
-        <input
-          type="text"
-          placeholder="Rechercher (titre, chauffeur, immat...)"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="p-2 border rounded w-1/3"
-        />
-        <select
-          value={filterStatut}
-          onChange={(e) => { setFilterStatut(e.target.value); setCurrentPage(1); }}
-          className="p-2 border rounded"
-        >
-          <option value="toutes">Tous les statuts</option>
-          <option value="a_venir">À venir</option>
-          <option value="en_cours">En cours</option>
-          <option value="terminee">Terminée</option>
-        </select>
-      </div>
-
-      {/* TABLEAU DES MISSIONS */}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100">
+      {/* Tableau */}
+      <div className="overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-100">
+        <table className="min-w-full table-fixed divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mission</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chauffeur</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Véhicule</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Itinéraire</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-32">Titre</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-32">Chauffeur</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-28">Camion</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-28">Remorque</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-48">Itinéraire</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-20">Statut</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 w-32">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {paginatedMissions.map((mission) => {
-              const chauffeur = chauffeurs.find((c) => c.id === mission.chauffeur_id);
-              const camion = camions.find((c) => c.id === mission.camion_id);
-              const remorque = remorques.find((r) => r.id === mission.remorque_id);
-
+          <tbody className="text-sm">
+            {paginatedMissions.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-8 text-center text-gray-500">Aucune mission trouvée</td>
+              </tr>
+            ) : paginatedMissions.map(m => {
+              const chauffeur = chauffeurs.find(c => c.id === m.chauffeur_id);
+              const camion = camions.find(c => c.id === m.camion_id);
+              const remorque = m.remorque_id ? camions.find(c => c.id === m.remorque_id) : null;
               return (
-                <tr key={mission.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{mission.titre}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex items-center gap-2">
-                    <User size={16} /> {chauffeur?.name || "N/A"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <Truck size={16} className="inline mr-2" />{camion?.immatriculation || "N/A"}
-                    {remorque && (<span> + Rem. {remorque.immatriculation}</span>)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {mission.depart} ➡️ {mission.destination}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {renderStatut(mission.statut)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      {mission.statut !== "terminee" && (
-                        <Button variant="ghost" size="sm" onClick={() => terminerMission(mission.id)} title="Terminer la mission">
-                          <Check size={18} className="text-green-600" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => prepareEdit(mission)} title="Modifier la mission">
-                        <Pencil size={18} className="text-blue-600" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => supprimerMission(mission.id)} title="Supprimer la mission">
-                        <Trash2 size={18} className="text-red-600" />
-                      </Button>
-                    </div>
+                <tr key={m.id} className="hover:bg-blue-50/50 transition">
+                  <td className="px-4 py-2 font-medium text-gray-700 truncate" title={m.titre}>{m.titre}</td>
+                  <td className="px-4 py-2 text-gray-600 truncate" title={chauffeur?.name || "N/A"}>{chauffeur?.name || "N/A"}</td>
+                  <td className="px-4 py-2 text-gray-600 truncate" title={camion?.immatriculation || "N/A"}>{camion?.immatriculation || "N/A"}</td>
+                  <td className="px-4 py-2 text-gray-600 truncate" title={remorque?.immatriculation || "-"}>{remorque?.immatriculation || "-"}</td>
+                  <td className="px-4 py-2 text-gray-600 break-words max-w-[200px]" title={`${m.depart} ➡ ${m.destination}`}>{m.depart} ➡ {m.destination}</td>
+                  <td className="px-4 py-2">{getStatusBadge(m.statut)}</td>
+                  <td className="px-4 py-2 flex justify-center gap-2">
+                    {m.statut !== "terminee" && <Button variant="outline" size="sm" onClick={() => terminerMission(m)}><Check size={16}/></Button>}
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(m)}><Pencil size={16}/></Button>
+                    <Button variant="destructive" size="sm" onClick={() => { setMissionToDelete(m); setConfirmOpen(true); }}><Trash2 size={16}/></Button>
                   </td>
                 </tr>
-              );
+              )
             })}
           </tbody>
         </table>
       </div>
 
-      {/* PAGINATION */}
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center space-x-2 mt-4">
-          <Button 
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            variant="outline"
-          >
-            Précédent
-          </Button>
-          <span className="text-sm text-gray-700">Page {currentPage} de {totalPages}</span>
-          <Button 
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            variant="outline"
-          >
-            Suivant
-          </Button>
+        <div className="flex justify-center gap-2 mt-4 p-2 bg-white rounded-lg shadow border border-gray-100">
+          {Array.from({ length: totalPages }, (_, i) => (
+            <Button key={i} size="sm" variant={i + 1 === currentPage ? "default" : "outline"} onClick={() => setCurrentPage(i + 1)}>
+              {i + 1}
+            </Button>
+          ))}
         </div>
       )}
+
+      {/* Modal */}
+      {showModal && <MissionModal
+        editingMission={editingMission} setShowModal={setShowModal} fetchMissions={fetchData}
+        titre={titre} setTitre={setTitre} description={description} setDescription={setDescription}
+        depart={depart} setDepart={setDepart} destination={destination} setDestination={setDestination}
+        chauffeurId={chauffeurId} setChauffeurId={setChauffeurId}
+        camionId={camionId} setCamionId={setCamionId}
+        remorqueId={remorqueId} setRemorqueId={setRemorqueId}
+        chauffeurs={chauffeurs} camions={camions}
+      />}
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={setConfirmOpen}
+        title="Supprimer cette mission ?"
+        description={`Êtes-vous sûr de vouloir supprimer "${missionToDelete?.titre}" ?`}
+        confirmLabel="Supprimer"
+        confirmColor="bg-red-600 hover:bg-red-700"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
