@@ -1,436 +1,280 @@
-// src/pages/ChauffeurDashboard.js
-import React, { useEffect, useState, useMemo } from "react";
+// src/pages/ChauffeurDashboard.js - Version Pro "Waouh"
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient.js";
-import { toast, Toaster } from "react-hot-toast";
-import { Truck, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
 import logoSociete from "../assets/logo.png";
+import {
+  Menu,
+  X,
+  User,
+  LogOut,
+  Truck,
+  LayoutDashboard,
+  AlertTriangle,
+  Loader2,
+  CalendarCheck,
+  Hourglass,
+  Archive,
+} from "lucide-react";
+import ModalMission from "../components/ModalMission.js";
 
-// Profil
-import ProfilUser from "../components/ProfilUser.js";
+// --- Constantes ---
+const MENU_ITEMS = [
+  { label: "Tableau de bord", icon: LayoutDashboard, path: "/chauffeur" },
+  { label: "Missions", icon: Truck, path: "/missionshistorique" },
+  { label: "Pannes", icon: AlertTriangle, path: "/panneshistorique" },
+];
 
-// Leaflet
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+// --- Sidebar Desktop ---
+const DesktopSidebar = ({ navigate }) => (
+  <aside className="bg-blue-900 text-white w-64 hidden md:flex flex-col p-5 shadow-2xl sticky top-0 h-screen">
+    <div className="flex flex-col items-center mb-10 mt-4">
+      <img src={logoSociete} alt="Logo BATICOM" className="w-16 h-16 object-cover mb-3 rounded-xl bg-white p-1" />
+      <h2 className="text-2xl font-extrabold text-blue-200 tracking-widest uppercase">BATICOM</h2>
+    </div>
+    <nav className="flex flex-col gap-1 mt-6">
+      {MENU_ITEMS.map((item) => (
+        <button
+          key={item.label}
+          onClick={() => navigate(item.path)}
+          className="flex items-center gap-4 px-4 py-3 rounded-lg font-medium text-left text-blue-100 hover:bg-blue-700 hover:text-white transition-all duration-300 border-l-4 border-transparent hover:border-blue-300"
+        >
+          <item.icon size={22} /> <span className="text-base">{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  </aside>
+);
 
-export default function ChauffeurDashboard() {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [missions, setMissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [section, setSection] = useState("dashboard");
+// --- Sidebar Mobile ---
+const MobileSidebar = ({ menuOpen, setMenuOpen, navigate }) => (
+  <div
+    className={`fixed inset-0 z-50 md:hidden transition-transform duration-300 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+  >
+    <div className="absolute inset-0 bg-black/50" onClick={() => setMenuOpen(false)} />
+    <div className="relative bg-blue-900 w-64 h-full p-5 flex flex-col">
+      <div className="flex justify-between items-center mb-10">
+        <img src={logoSociete} alt="Logo BATICOM" className="w-12 h-12 object-cover rounded-xl bg-white p-1" />
+        <button onClick={() => setMenuOpen(false)} className="text-white p-2 hover:bg-blue-800 rounded-lg transition">
+          <X size={24} />
+        </button>
+      </div>
+      <nav className="flex flex-col gap-2">
+        {MENU_ITEMS.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => { navigate(item.path); setMenuOpen(false); }}
+            className="flex items-center gap-4 px-4 py-3 rounded-lg font-medium text-left text-blue-100 hover:bg-blue-700 hover:text-white transition-all duration-300 border-l-4 border-transparent hover:border-blue-300"
+          >
+            <item.icon size={20} /> {item.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  </div>
+);
 
-  // Modal panne
-  const [showPanneModal, setShowPanneModal] = useState(false);
-  const [selectedMission, setSelectedMission] = useState(null);
-  const [typePanne, setTypePanne] = useState("");
-  const [descriptionPanne, setDescriptionPanne] = useState("");
-  const [photo, setPhoto] = useState(null);
-
-  // Positions
-  const [positions, setPositions] = useState([]);
-
-  // Centre de la carte
-  const center = useMemo(() => {
-    const last = positions[positions.length - 1];
-    return last && last.latitude && last.longitude
-      ? [Number(last.latitude), Number(last.longitude)]
-      : [12.37, -1.53]; // par défaut Ouagadougou
-  }, [positions]);
-
-  // Récupération utilisateur et missions
-  useEffect(() => {
-    const fetchUserAndMissions = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) return navigate("/login");
-      setUser(user);
-
-      const { data: missionsData } = await supabase
-        .from("missions")
-        .select("*")
-        .eq("chauffeur_id", user.id)
-        .order("created_at", { ascending: false });
-
-      setMissions(missionsData || []);
-      setLoading(false);
-    };
-    fetchUserAndMissions();
-  }, [navigate]);
-
-  // Suivi GPS en temps réel
-  useEffect(() => {
-    if (!user) return;
-
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-
-        const newPos = {
-          latitude: Number(latitude),
-          longitude: Number(longitude),
-          created_at: new Date().toISOString(),
-        };
-
-        setPositions((prev) => [...prev, newPos]);
-
-        // On enregistre en base
-        const { error } = await supabase.from("positions").insert([{
-          chauffeur_id: user.id,
-          latitude: newPos.latitude,
-          longitude: newPos.longitude,
-        }]);
-
-        if (error) console.error("Erreur insertion position:", error);
-      },
-      (err) => console.error("Erreur GPS:", err),
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [user]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
-  const startMission = async (mission) => {
-    await supabase.from("missions").update({ statut: "en_cours" }).eq("id", mission.id);
-    setMissions((prev) =>
-      prev.map((m) => (m.id === mission.id ? { ...m, statut: "en_cours" } : m))
-    );
-  };
-
-  const finishMission = async (mission) => {
-    await supabase.from("missions").update({ statut: "terminee" }).eq("id", mission.id);
-    setMissions((prev) =>
-      prev.map((m) => (m.id === mission.id ? { ...m, statut: "terminee" } : m))
-    );
-  };
-
-  const declarePanne = async () => {
-    if (!typePanne || !descriptionPanne) return alert("Remplissez type et description");
-
-    let latitude = null,
-      longitude = null;
-    await new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          latitude = pos.coords.latitude;
-          longitude = pos.coords.longitude;
-          resolve();
-        },
-        (err) => {
-          console.error(err);
-          resolve();
-        }
-      );
-    });
-
-    let photoUrl = null;
-    if (photo) {
-      const fileExt = photo.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("pannes")
-        .upload(fileName, photo, { upsert: true });
-      if (!error) photoUrl = data.path;
-    }
-
-    const { error } = await supabase.from("alertespannes").insert([
-      {
-        mission_id: selectedMission.id,
-        chauffeur_id: user.id,
-        typepanne: typePanne,
-        description: descriptionPanne,
-        photo: photoUrl,
-        latitude,
-        longitude,
-      },
-    ]);
-
-    if (error) toast.error("Erreur lors de la déclaration de panne !");
-    else {
-      toast.success("Panne déclarée !");
-      setShowPanneModal(false);
-      setTypePanne("");
-      setDescriptionPanne("");
-      setPhoto(null);
-    }
-  };
-
-  if (loading)
-    return <div className="flex items-center justify-center h-screen">Chargement...</div>;
-
-  const missionsEnCours = missions.filter((m) => m.statut === "en_cours");
-  const missionsTerminees = missions.filter((m) => m.statut === "terminee");
-  const missionsAVenir = missions.filter((m) => m.statut === "a_venir");
-
-  const menuItems = [
-    { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
-    { key: "missions", label: "Missions", icon: <ClipboardList size={18} /> },
-  ];
-
-  return (
-    <div className="flex min-h-screen bg-gray-100 relative">
-      <Toaster position="top-right" />
-
-      {/* Sidebar mobile */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <aside className="bg-blue-900 text-white w-64 flex flex-col p-6 shadow-xl">
-            <div className="flex flex-col items-center mb-6">
-              <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
-              <h2 className="text-2xl font-bold">BATICOM</h2>
-            </div>
-            <nav className="flex-1 flex flex-col gap-3">
-              {menuItems.map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => {
-                    setSection(item.key);
-                    setSidebarOpen(false);
-                  }}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${
-                    section === item.key ? "bg-blue-700" : "hover:bg-blue-800"
-                  }`}
-                >
-                  {item.icon} {item.label}
-                </button>
-              ))}
-            </nav>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold"
-            >
-              Fermer
-            </button>
-          </aside>
-          <div className="flex-1 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />
+// --- Header ---
+const DashboardHeader = ({ user, handleLogout, setMenuOpen, profileMenu, setProfileMenu }) => (
+  <header className="bg-white sticky top-0 z-40 shadow-lg px-6 sm:px-10 py-4 flex justify-between items-center border-b border-gray-200">
+    <div className="flex items-center gap-4">
+      <button
+        onClick={() => setMenuOpen(true)}
+        className="md:hidden text-blue-800 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu size={28} />
+      </button>
+      <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+    </div>
+    <div className="relative">
+      <button
+        onClick={() => setProfileMenu(prev => !prev)}
+        className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        aria-expanded={profileMenu}
+      >
+        <User className="text-blue-600 w-6 h-6 bg-blue-50 p-1 rounded-full" />
+        <span className="hidden sm:inline font-medium text-gray-700 truncate max-w-[140px]">{user?.email}</span>
+      </button>
+      {profileMenu && (
+        <div className="absolute right-0 mt-3 w-56 bg-white shadow-xl rounded-lg border border-gray-100 overflow-hidden z-50 animate-fadeInUp">
+          <div className="px-4 py-3 border-b bg-gray-50/70">
+            <p className="text-sm text-gray-500">Connecté:</p>
+            <p className="text-base font-semibold text-gray-800 truncate">{user?.email}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 text-left transition-colors font-medium"
+          >
+            <LogOut size={18} /> Déconnexion
+          </button>
         </div>
       )}
-
-      {/* Sidebar desktop */}
-      <aside className="bg-blue-900 text-white w-64 hidden md:flex flex-col p-6 shadow-xl z-40">
-        <div className="flex flex-col items-center mb-8">
-          <img src={logoSociete} alt="Logo" className="w-16 h-16 object-contain mb-2" />
-          <h2 className="text-2xl font-bold">BATICOM</h2>
-        </div>
-        <nav className="flex-1 flex flex-col gap-3">
-          {menuItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setSection(item.key)}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition ${
-                section === item.key ? "bg-blue-700" : "hover:bg-blue-800"
-              }`}
-            >
-              {item.icon} {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col z-0">
-        <header className="bg-white shadow-md px-4 sm:px-6 py-4 flex justify-between items-center relative z-10">
-          <div className="flex items-center space-x-3">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden text-blue-900">
-              <Menu size={28} />
-            </button>
-          </div>
-          <ProfilUser user={user} setUser={setUser} />
-        </header>
-
-        <div className="flex-1 flex flex-col p-4 sm:p-6">
-          {section === "dashboard" && (
-            <>
-              {/* Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                <StatCard
-                  title="Missions en cours"
-                  value={missionsEnCours.length}
-                  color="from-blue-500 to-blue-600"
-                />
-                <StatCard
-                  title="Missions terminées"
-                  value={missionsTerminees.length}
-                  color="from-green-500 to-green-600"
-                />
-                <StatCard
-                  title="Missions à venir"
-                  value={missionsAVenir.length}
-                  color="from-yellow-400 to-yellow-500"
-                />
-              </div>
-
-              {/* Carte */}
-              <div className="relative z-0 h-80 sm:h-96 w-full rounded-xl shadow-lg overflow-hidden mt-6">
-                <MapContainer center={center} zoom={13} className="h-full w-full z-0 rounded-xl">
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
-                  />
-                  {positions.length > 0 && <ChauffeurTrajet positions={positions} />}
-                </MapContainer>
-              </div>
-            </>
-          )}
-
-          {section === "missions" && (
-            <MissionTable
-              missions={missions}
-              startMission={startMission}
-              finishMission={finishMission}
-              setSelectedMission={setSelectedMission}
-              setShowPanneModal={setShowPanneModal}
-            />
-          )}
-
-          {section === "profil" && <ProfilUser user={user} setUser={setUser} />}
-        </div>
-
-        {/* Modal Panne */}
-        {showPanneModal && (
-          <ModalPanne
-            onClose={() => setShowPanneModal(false)}
-            typePanne={typePanne}
-            setTypePanne={setTypePanne}
-            descriptionPanne={descriptionPanne}
-            setDescriptionPanne={setDescriptionPanne}
-            photo={photo}
-            setPhoto={setPhoto}
-            declarePanne={declarePanne}
-          />
-        )}
-      </div>
     </div>
-  );
-}
+  </header>
+);
 
-// --------- Composants enfants ---------
-function ChauffeurTrajet({ positions }) {
-  if (!positions || positions.length === 0) return null;
-  const polyline = positions.map((p) => [Number(p.latitude), Number(p.longitude)]);
-  const lastPos = positions[positions.length - 1];
+// --- Skeleton Card ---
+const SkeletonCard = () => (
+  <div className="bg-white p-6 rounded-xl shadow-lg animate-pulse min-h-[320px]">
+    <div className="h-6 w-32 bg-gray-200 rounded mb-4"></div>
+    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+    <div className="h-4 bg-gray-200 rounded"></div>
+  </div>
+);
 
-  return (
-    <>
-      <Polyline positions={polyline} color="blue" />
-      <Marker position={[Number(lastPos.latitude), Number(lastPos.longitude)]}>
-        <Popup>Dernière position : {new Date(lastPos.created_at).toLocaleTimeString()}</Popup>
-      </Marker>
-    </>
-  );
-}
-
-function StatCard({ title, value, color }) {
-  return (
-    <div
-      className={`bg-gradient-to-r ${color} text-white rounded-xl shadow-lg p-5 transform transition duration-300 hover:scale-105 hover:shadow-2xl`}
-    >
+// --- Mission Card ---
+const MissionCard = ({ title, data, setModalMission, icon: Icon, accentColor }) => (
+  <div
+    className={`bg-white p-6 rounded-xl shadow-lg border-t-8 ${accentColor} transition-transform duration-500 transform hover:scale-105 hover:shadow-2xl`}
+    style={{ minHeight: '250px' }}
+  >
+    <div className="flex items-center justify-between mb-6 border-b pb-4 border-gray-100">
       <div className="flex items-center gap-3">
-        <ClipboardList size={28} />
-        <div>
-          <h3 className="text-2xl font-bold">{value}</h3>
-          <p className="opacity-90 text-sm">{title}</p>
-        </div>
+        <Icon size={24} className={accentColor.replace('border-t-8 border-', 'text-')} />
+        <h2 className="text-xl font-extrabold text-gray-800 uppercase tracking-wide">{title}</h2>
       </div>
+      <span className={`px-3 py-1 text-sm font-bold rounded-full ${accentColor.replace('border-t-8 border-', 'bg-')} text-white`}>
+        {data.length}
+      </span>
     </div>
-  );
-}
 
-function MissionTable({ missions, startMission, finishMission, setSelectedMission, setShowPanneModal }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full bg-white shadow rounded-xl overflow-hidden">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="py-2 px-4 text-left">Mission</th>
-            <th className="py-2 px-4 text-left">Description</th>
-            <th className="py-2 px-4 text-left">Camion</th>
-            <th className="py-2 px-4 text-left">Statut</th>
-            <th className="py-2 px-4 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {missions.map((m) => (
-            <tr key={m.id} className="border-b">
-              <td className="py-2 px-4">{m.nom}</td>
-              <td className="py-2 px-4">{m.description}</td>
-              <td className="py-2 px-4">{m.camion_id}</td>
-              <td className="py-2 px-4">{m.statut}</td>
-              <td className="py-2 px-4 flex gap-2">
-                {m.statut === "a_venir" && (
-                  <button
-                    onClick={() => startMission(m)}
-                    className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 text-sm"
-                  >
-                    Démarrer
-                  </button>
-                )}
-                {m.statut === "en_cours" && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setSelectedMission(m);
-                        setShowPanneModal(true);
-                      }}
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
-                    >
-                      Déclarer panne
-                    </button>
-                    <button
-                      onClick={() => finishMission(m)}
-                      className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
-                    >
-                      Terminer
-                    </button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ModalPanne({ onClose, typePanne, setTypePanne, descriptionPanne, setDescriptionPanne, photo, setPhoto, declarePanne }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-2">
-      <div className="bg-white p-4 sm:p-6 rounded w-full max-w-sm sm:max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold">Déclarer une panne</h2>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </div>
-        <div className="flex flex-col gap-2">
-          <input
-            type="text"
-            placeholder="Type de panne"
-            value={typePanne}
-            onChange={(e) => setTypePanne(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-          <textarea
-            placeholder="Description"
-            value={descriptionPanne}
-            onChange={(e) => setDescriptionPanne(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-          <input type="file" onChange={(e) => setPhoto(e.target.files[0])} className="w-full text-sm" />
+    {data.length === 0 ? (
+      <div className="flex flex-col items-center justify-center h-48 rounded-md p-4 text-center">
+        <p className="text-gray-400 italic text-md">Aucune mission trouvée.</p>
+      </div>
+    ) : (
+      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+        {data.map((m) => (
           <button
-            onClick={declarePanne}
-            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-2"
+            key={m.id_uuid}
+            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200"
+            onClick={() => setModalMission(m)}
           >
-            Envoyer
+            <h3 className="font-semibold text-gray-800 truncate">{m.titre}</h3>
+            <p className="text-gray-500 text-xs truncate mt-0.5">{m.description}</p>
           </button>
-        </div>
+        ))}
       </div>
+    )}
+  </div>
+);
+
+// --- Composant Principal ---
+export default function ChauffeurDashboard() {
+  const navigate = useNavigate();
+  const [state, setState] = useState({ user: null, chauffeurId: null, missions: [], loading: true, error: null });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenu, setProfileMenu] = useState(false);
+  const [modalMission, setModalMission] = useState(null);
+
+  const { user, chauffeurId, missions, loading, error } = state;
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) return navigate("/login");
+      setState(s => ({ ...s, user: authUser, chauffeurId: authUser.id, loading: false }));
+    };
+    fetchUser();
+  }, [navigate]);
+
+  const fetchMissions = useCallback(async () => {
+    if (!chauffeurId) return;
+    setState(s => ({ ...s, loading: true, error: null }));
+    const { data, error: missionsError } = await supabase
+      .from("missions")
+      .select("*")
+      .eq("chauffeur_id", chauffeurId)
+      .order("created_at", { ascending: false });
+    if (missionsError) {
+      setState(s => ({ ...s, error: "Impossible de charger les missions.", loading: false }));
+      return;
+    }
+    setState(s => ({ ...s, missions: data || [], loading: false }));
+  }, [chauffeurId]);
+
+  useEffect(() => { if (chauffeurId) fetchMissions(); }, [chauffeurId, fetchMissions]);
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  }, [navigate]);
+
+  const { missionAVenir, missionEnCours, missionTerminee } = useMemo(() => {
+	  
+	  //1. Filtrer les missions
+    const terminees = missions.filter(m => m.statut === "terminee");
+// 2. Trouver la dernière mission terminée
+    // NOTE: Votre fetchMissions trie déjà par 'created_at' décroissant,
+    // donc le premier élément [0] est le plus récent.
+    const derniereMissionTerminee = terminees.length > 0 ? [terminees[0]] : [];
+    return {
+      missionAVenir: missions.filter(m => m.statut === "a_venir"),
+      missionEnCours: missions.filter(m => m.statut === "en_cours"),
+      missionTerminee: derniereMissionTerminee,
+    };
+  }, [missions]);
+
+  const cards = useMemo(() => [
+    { title: "À VENIR", data: missionAVenir, icon: CalendarCheck, accentColor: "border-blue-500" },
+    { title: "EN COURS", data: missionEnCours, icon: Hourglass, accentColor: "border-yellow-500" },
+    { title: "TERMINÉES", data: missionTerminee, icon: Archive, accentColor: "border-green-500" },
+  ], [missionAVenir, missionEnCours, missionTerminee]);
+
+  if (loading && !user) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10 mr-3" />
+        <p className="text-xl font-semibold text-gray-700">Connexion en cours...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-gray-100">
+      <DesktopSidebar navigate={navigate} />
+      <MobileSidebar menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} />
+      <div className="flex-1 flex flex-col">
+        <DashboardHeader
+          user={user}
+          handleLogout={handleLogout}
+          setMenuOpen={setMenuOpen}
+          profileMenu={profileMenu}
+          setProfileMenu={setProfileMenu}
+        />
+        <main className="flex-1 flex flex-col p-6 sm:p-10 space-y-8">
+          {error && (
+            <div className="p-4 bg-red-100 border-l-4 border-red-500 text-red-700 font-medium rounded-lg shadow-sm">
+              <p className="font-bold">Erreur de chargement:</p>
+              <p>{error}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {loading ? Array(3).fill(0).map((_, i) => <SkeletonCard key={i} />) :
+              cards.map(card => (
+                <MissionCard
+                  key={card.title}
+                  title={card.title}
+                  data={card.data}
+                  icon={card.icon}
+                  accentColor={card.accentColor}
+                  setModalMission={setModalMission}
+                />
+              ))
+            }
+          </div>
+        </main>
+      </div>
+      {modalMission && (
+        <ModalMission
+          mission={modalMission}
+          onClose={() => setModalMission(null)}
+          refreshMissions={fetchMissions}
+        />
+      )}
     </div>
   );
 }

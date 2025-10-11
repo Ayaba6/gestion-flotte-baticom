@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardHeader } from "../components/ui/card.js";
+import { Card, CardHeader, CardContent } from "../components/ui/card.js";
 import { useToast } from "../components/ui/use-toast.js";
 import ConfirmDialog from "../components/ui/ConfirmDialog.js";
 import CamionModal from "./CamionModal.js";
@@ -11,7 +11,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// 💡 Badge pour le statut
+// Badge statut
 const getStatusBadge = (statut) => {
   const colors = {
     Disponible: "bg-green-100 text-green-800",
@@ -21,7 +21,7 @@ const getStatusBadge = (statut) => {
   return <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[statut] || "bg-gray-100 text-gray-800"}`}>{statut}</span>;
 };
 
-// 💡 Documents comme dans UserSection
+// Documents
 const renderDocuments = (c) => {
   const docs = [];
   if (c.cartegriseUrl) docs.push(<a key="cg" href={c.cartegriseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1"><FileText size={14}/> Carte Grise</a>);
@@ -43,7 +43,6 @@ export default function CamionsSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
-  // 🔄 Charger les camions
   const fetchCamions = useCallback(async () => {
     const { data, error } = await supabase.from("camions").select("*").order("inserted_at", { ascending: false });
     if (error) toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
@@ -52,7 +51,6 @@ export default function CamionsSection() {
 
   useEffect(() => { fetchCamions(); }, [fetchCamions]);
 
-  // 🗑️ Suppression confirmée
   const confirmDelete = async () => {
     try {
       const { error } = await supabase.from("camions").delete().eq("id", camionToDelete.id);
@@ -69,7 +67,6 @@ export default function CamionsSection() {
   const handleEdit = (c) => { setEditingCamion(c); setShowModal(true); };
   const handleAdd = () => { setEditingCamion(null); setShowModal(true); };
 
-  // 🔍 Filtrage et pagination
   const filteredCamions = camions.filter(c =>
     c.immatriculation?.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (typeFilter === "" || c.type === typeFilter) &&
@@ -79,7 +76,6 @@ export default function CamionsSection() {
   const totalPages = Math.ceil(filteredCamions.length / ITEMS_PER_PAGE);
   const paginatedCamions = filteredCamions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // 📊 Exports
   const exportExcel = () => {
     const wsData = filteredCamions.map(c => ({
       Photo: c.photoUrl ? "Oui" : "Non",
@@ -188,8 +184,8 @@ export default function CamionsSection() {
         </div>
       </div>
 
-      {/* Tableau */}
-      <div className="overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-100">
+      {/* Tableau desktop */}
+      <div className="hidden md:block overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-100">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -208,11 +204,7 @@ export default function CamionsSection() {
             ) : paginatedCamions.map(c => (
               <tr key={c.id} className="hover:bg-blue-50/50 transition">
                 <td className="px-4 py-2 text-center">
-                  {c.photoUrl ? (
-                    <img src={c.photoUrl} alt="camion" className="h-10 w-10 object-cover rounded-full shadow-md mx-auto" />
-                  ) : (
-                    <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-[10px] mx-auto border">No Photo</div>
-                  )}
+                  {c.photoUrl ? <img src={c.photoUrl} alt="camion" className="h-10 w-10 object-cover rounded-full shadow-md mx-auto"/> : <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-[10px] mx-auto border">No Photo</div>}
                 </td>
                 <td className="px-4 py-2 font-medium text-gray-700">{c.immatriculation}</td>
                 <td className="px-4 py-2 text-gray-600">{c.type}</td>
@@ -227,6 +219,34 @@ export default function CamionsSection() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Cartes mobile */}
+      <div className="md:hidden space-y-4">
+        {paginatedCamions.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 bg-white rounded-xl shadow border border-gray-100">Aucun camion trouvé</div>
+        ) : paginatedCamions.map(c => (
+          <Card key={c.id} className="bg-white shadow-xl border border-gray-100">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-gray-700">{c.immatriculation}</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(c)}><Pencil size={16}/></Button>
+                  <Button variant="destructive" size="sm" onClick={() => { setCamionToDelete(c); setConfirmOpen(true); }}><Trash2 size={16}/></Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.photoUrl ? <img src={c.photoUrl} alt="camion" className="h-12 w-12 object-cover rounded-full shadow-md"/> : <div className="h-12 w-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-[10px] border">No Photo</div>}
+                <div className="flex flex-col text-gray-600 text-sm">
+                  <span><strong>Type:</strong> {c.type}</span>
+                  <span><strong>Modèle:</strong> {c.marquemodele}</span>
+                  <span><strong>Statut:</strong> {getStatusBadge(c.statut)}</span>
+                </div>
+              </div>
+              <div className="pt-2">{renderDocuments(c)}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Pagination */}
@@ -246,10 +266,8 @@ export default function CamionsSection() {
         </div>
       )}
 
-      {/* Modal */}
       {showModal && <CamionModal editingCamion={editingCamion} setShowModal={setShowModal} fetchCamions={fetchCamions} />}
 
-      {/* Dialog confirmation */}
       <ConfirmDialog
         open={confirmOpen}
         onClose={setConfirmOpen}

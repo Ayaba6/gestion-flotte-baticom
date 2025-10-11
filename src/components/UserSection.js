@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/supabaseClient.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardHeader } from "../components/ui/card.js";
+import { Card, CardHeader, CardContent } from "../components/ui/card.js";
 import { useToast } from "../components/ui/use-toast.js";
 import ConfirmDialog from "../components/ui/ConfirmDialog.js";
 import UserModal from "./UserModal.js";
@@ -23,7 +23,6 @@ export default function UserSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const USERS_PER_PAGE = 5;
 
-  // 🔄 Charger les utilisateurs
   const fetchUsers = async () => {
     const { data, error } = await supabase
       .from("users")
@@ -36,7 +35,6 @@ export default function UserSection() {
 
   useEffect(() => { fetchUsers(); }, []);
 
-  // 🗑️ Suppression confirmée
   const confirmDelete = async () => {
     try {
       const { error } = await supabase.from("users").delete().eq("id", userToDelete.id);
@@ -53,7 +51,6 @@ export default function UserSection() {
   const handleEdit = (user) => { setEditingUser(user); setShowModal(true); };
   const handleAdd = () => { setEditingUser(null); setShowModal(true); };
 
-  // 💡 Badge pour le rôle
   const getRoleBadge = (role) => {
     const colors = {
       admin: "bg-red-100 text-red-800",
@@ -63,7 +60,6 @@ export default function UserSection() {
     return <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${colors[role] || "bg-gray-100 text-gray-800"}`}>{role}</span>;
   };
 
-  // 💾 Affichage des documents
   const renderDocuments = (user) => {
     const docs = [];
     if (user.cnibUrl) docs.push(<a key="cnib" href={user.cnibUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1"><FileText size={14}/> CNIB</a>);
@@ -73,7 +69,6 @@ export default function UserSection() {
     return docs.length ? <div className="flex flex-col gap-1">{docs}</div> : <span className="text-gray-400 italic">Aucun</span>;
   };
 
-  // 🔍 Filtrage et pagination
   const filteredUsers = users.filter(u =>
     u.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (roleFilter === "" || u.role === roleFilter)
@@ -82,7 +77,6 @@ export default function UserSection() {
   const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * USERS_PER_PAGE, currentPage * USERS_PER_PAGE);
 
-  // 📊 Exports
   const exportExcel = () => {
     const wsData = filteredUsers.map(u => ({ Nom: u.name, Email: u.email, Téléphone: u.phone, Rôle: u.role }));
     const ws = XLSX.utils.json_to_sheet(wsData);
@@ -169,16 +163,16 @@ export default function UserSection() {
         </div>
       </div>
 
-      {/* Tableau */}
-      <div className="overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-100">
+      {/* Tableau (desktop) */}
+      <div className="hidden md:block overflow-x-auto bg-white shadow-xl rounded-xl border border-gray-100">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Nom</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 hidden sm:table-cell">Email</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 hidden md:table-cell">Téléphone</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Email</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Téléphone</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Rôle</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 hidden lg:table-cell">Documents</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Documents</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
@@ -188,10 +182,10 @@ export default function UserSection() {
             ) : paginatedUsers.map(u => (
               <tr key={u.id} className="hover:bg-blue-50/50 transition">
                 <td className="px-4 py-2 font-medium text-gray-700">{u.name}</td>
-                <td className="px-4 py-2 text-gray-600 hidden sm:table-cell">{u.email}</td>
-                <td className="px-4 py-2 text-gray-600 hidden md:table-cell">{u.phone || "N/A"}</td>
+                <td className="px-4 py-2 text-gray-600">{u.email}</td>
+                <td className="px-4 py-2 text-gray-600">{u.phone || "N/A"}</td>
                 <td className="px-4 py-2">{getRoleBadge(u.role)}</td>
-                <td className="px-4 py-2 hidden lg:table-cell">{renderDocuments(u)}</td>
+                <td className="px-4 py-2">{renderDocuments(u)}</td>
                 <td className="px-4 py-2 flex justify-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(u)}><Pencil size={16}/></Button>
                   <Button variant="destructive" size="sm" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }}><Trash2 size={16}/></Button>
@@ -200,6 +194,29 @@ export default function UserSection() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Cartes utilisateurs (mobile) */}
+      <div className="md:hidden space-y-4">
+        {paginatedUsers.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 bg-white rounded-xl shadow border border-gray-100">Aucun utilisateur trouvé</div>
+        ) : paginatedUsers.map(u => (
+          <Card key={u.id} className="bg-white shadow-xl border border-gray-100">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-gray-700">{u.name}</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(u)}><Pencil size={16}/></Button>
+                  <Button variant="destructive" size="sm" onClick={() => { setUserToDelete(u); setConfirmOpen(true); }}><Trash2 size={16}/></Button>
+                </div>
+              </div>
+              <div className="text-gray-600 text-sm"><strong>Email:</strong> {u.email}</div>
+              <div className="text-gray-600 text-sm"><strong>Téléphone:</strong> {u.phone || "N/A"}</div>
+              <div>{getRoleBadge(u.role)}</div>
+              <div className="pt-2">{renderDocuments(u)}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Pagination */}
@@ -219,10 +236,8 @@ export default function UserSection() {
         </div>
       )}
 
-      {/* Modale */}
       {showModal && <UserModal editingUser={editingUser} setShowModal={setShowModal} fetchUsers={fetchUsers} />}
 
-      {/* Dialog confirmation */}
       <ConfirmDialog
         open={confirmOpen}
         onClose={setConfirmOpen}

@@ -1,20 +1,25 @@
+// src/App.js
 import { Routes, Route, Navigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 
+// Pages
 import Login from "./pages/Login.js";
 
 // Dashboards
 import AdminDashboard from "./pages/AdminDashboard.js";
 import SuperviseurDashboard from "./pages/SuperviseurDashboard.js";
 import ChauffeurDashboard from "./pages/ChauffeurDashboard.js";
-import BillingExpenses from "./pages/BillingExpenses.js"; // <-- import de ta page
-
+import BillingExpenses from "./pages/BillingExpenses.js";
 
 // Admin modules
 import AdminUsers from "./components/AdminUsers.js";
 import AdminFlotte from "./components/AdminFlotte.js";
 import PannesDeclarees from "./components/PannesDeclarees.js";
 import AlertesExpiration from "./components/AlertesExpiration.js";
+
+// Chauffeur modules
+import MissionsHistorique from "./components/MissionsHistorique.js";
+import PannesHistorique from "./components/PannesHistorique.js";
 
 // ProtectedRoute
 import ProtectedRoute from "./components/ProtectedRoute.js";
@@ -66,8 +71,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/billing"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <BillingExpenses />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Superviseur */}
+      {/* Superviseur routes */}
       <Route
         path="/superviseur"
         element={
@@ -77,7 +90,7 @@ export default function App() {
         }
       />
 
-      {/* Chauffeur */}
+      {/* Chauffeur routes */}
       <Route
         path="/chauffeur"
         element={
@@ -86,17 +99,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-	  
-	  {/* Facture & depenses */}
       <Route
-        path="/billing"
+        path="/missionshistorique"
         element={
-          <ProtectedRoute requiredRole="admin">
-            <BillingExpenses />
+          <ProtectedRoute requiredRole="chauffeur">
+            <MissionsHistorique />
           </ProtectedRoute>
         }
       />
-	  
+      <Route
+        path="/panneshistorique"
+        element={
+          <ProtectedRoute requiredRole="chauffeur">
+            <PannesHistorique />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Redirection par défaut */}
       <Route path="*" element={<Navigate to="/login" replace />} />
