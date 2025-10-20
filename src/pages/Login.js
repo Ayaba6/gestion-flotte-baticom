@@ -12,26 +12,13 @@ const ROLE_REDIRECTS = {
   chauffeur: "/chauffeur",
 };
 
-// Composant pour l'effet de scintillement (si vous utilisez un système comme HeroIcons ou une librairie d'animation)
-// Pour l'instant, nous utiliserons une simple div stylisée comme un point lumineux.
+// Composant scintillant pour effet dynamique
 const Scintillant = ({ delay }) => (
   <div
     className="absolute w-1 h-1 bg-white/70 rounded-full animate-scintillement"
     style={{ animationDelay: delay }}
   ></div>
 );
-
-// --- Définition des animations Tailwind CSS (à ajouter dans votre fichier CSS principal si vous ne pouvez pas les définir en JSX) ---
-/* @layer components {
-  @keyframes scintillement {
-    0%, 100% { opacity: 0; transform: scale(0.5); }
-    50% { opacity: 1; transform: scale(1); }
-  }
-  .animate-scintillement {
-    animation: scintillement 3s infinite ease-in-out;
-  }
-}
-*/
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,7 +28,6 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fonction de gestion des erreurs (inchangée)
   const getFriendlyErrorMessage = (error) => {
     if (error.message.includes("Invalid login credentials")) {
       return "Email ou mot de passe invalide. Veuillez vérifier vos informations.";
@@ -52,14 +38,12 @@ export default function Login() {
     return "Une erreur inattendue est survenue. Veuillez réessayer.";
   };
 
-  // Fonction de connexion (inchangée)
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage("");
 
     try {
-      // 1. Authentification
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -70,7 +54,6 @@ export default function Login() {
         return;
       }
 
-      // 2. Vérification du rôle et récupération du profil
       const { data: profile, error: profileError } = await supabase
         .from("users")
         .select("role")
@@ -83,7 +66,6 @@ export default function Login() {
         return;
       }
 
-      // 3. Redirection basée sur le rôle
       const redirectPath = ROLE_REDIRECTS[profile.role] || "/";
       navigate(redirectPath);
 
@@ -95,64 +77,50 @@ export default function Login() {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword((prev) => !prev);
-  };
+  const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-blue-50 p-4">
       <div className="bg-white shadow-2xl rounded-xl flex w-full max-w-4xl overflow-hidden border border-gray-200">
         
-        {/* MODIFICATION MAJEURE ICI : Left Branding avec effet dynamique */}
-        <div className="hidden md:flex flex-col items-center justify-center bg-green-800 text-white w-2/5 p-10 relative overflow-hidden">
-          
-          {/* FOND DYNAMIQUE : Grille Interconnectée Scintillante */}
+        {/* Left Branding */}
+        <div className="hidden md:flex flex-col items-center justify-center bg-blue-600 text-white w-2/5 p-10 relative overflow-hidden">
           <div className="absolute inset-0 opacity-10">
-            {/* Vous pouvez générer ces points de manière dynamique si vous le souhaitez */}
-            <Scintillant delay="0s" className="top-1/4 left-1/4" />
-            <Scintillant delay="1s" className="top-3/4 left-1/3" />
-            <Scintillant delay="2s" className="top-1/2 left-3/4" />
-            <Scintillant delay="0.5s" className="top-1/12 left-1/2" />
-            <Scintillant delay="1.5s" className="top-2/3 left-1/6" />
-            <Scintillant delay="2.5s" className="top-1/5 right-1/5" />
+            <Scintillant delay="0s" />
+            <Scintillant delay="1s" />
+            <Scintillant delay="2s" />
+            <Scintillant delay="0.5s" />
+            <Scintillant delay="1.5s" />
+            <Scintillant delay="2.5s" />
           </div>
-
-          {/* Ajout d'une pseudo-grille pour l'effet d'interconnexion (optionnel) */}
           <div className="absolute inset-0 bg-repeat opacity-5" style={{
-            backgroundImage: "linear-gradient(to right, #00C853 1px, transparent 1px), linear-gradient(to bottom, #00C853 1px, transparent 1px)",
+            backgroundImage: "linear-gradient(to right, #00BFFF 1px, transparent 1px), linear-gradient(to bottom, #00BFFF 1px, transparent 1px)",
             backgroundSize: "30px 30px"
           }}></div>
-          
-
-          {/* Contenu de la marque au premier plan (z-10) */}
           <div className="relative z-10 flex flex-col items-center justify-center space-y-4">
-            <img 
-                src={logoSociete} 
-                alt="Logo BATICOM" 
-                className="w-24 h-24 object-contain mb-4 filter drop-shadow-lg" 
-            />
+            <img src={logoSociete} alt="Logo BATICOM" className="w-24 h-24 object-contain mb-4 filter drop-shadow-lg" />
             <h1 className="text-5xl font-extrabold tracking-widest text-white shadow-text">BATICOM</h1>
-            <p className="text-green-200 text-center font-light leading-relaxed text-lg">
+            <p className="text-blue-200 text-center font-light leading-relaxed text-lg">
               Portail de gestion de la flotte 🚛 et des opérations.
             </p>
           </div>
         </div>
 
-        {/* Right Form (inchangé, mais utilise les améliorations précédentes) */}
-        <div className="flex-1 p-8 sm:p-12 flex flex-col justify-center">
-          <h2 className="text-3xl font-extrabold text-green-700 mb-8 text-center">Connexion Sécurisée</h2>
+        {/* Right Form */}
+        <div className="flex-1 p-8 sm:p-12 flex flex-col justify-center bg-gradient-to-b from-blue-50 to-white">
+          <h2 className="text-3xl font-extrabold text-blue-600 mb-8 text-center">Connexion Sécurisée</h2>
 
           {errorMessage && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-300 text-red-700 rounded-lg text-sm font-medium text-center shadow-sm">
+            <div className="mb-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm font-medium text-center shadow-sm">
               {errorMessage}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {/* Champ Email */}
+            {/* Email */}
             <div>
               <label htmlFor="email" className="block text-gray-700 font-semibold mb-2 text-sm">Email</label>
-              <div className="relative flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition duration-150">
+              <div className="relative flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400 transition duration-150">
                 <Mail className="text-gray-400 w-5 h-5 ml-3" />
                 <input
                   id="email"
@@ -167,10 +135,10 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Champ Mot de passe */}
+            {/* Password */}
             <div>
               <label htmlFor="password" className="block text-gray-700 font-semibold mb-2 text-sm">Mot de passe</label>
-              <div className="relative flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition duration-150">
+              <div className="relative flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400 transition duration-150">
                 <Lock className="text-gray-400 w-5 h-5 ml-3" />
                 <input
                   id="password"
@@ -193,11 +161,11 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Bouton de Connexion */}
+            {/* Bouton Connexion */}
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="w-full py-3 mt-4 bg-green-600 text-white font-extrabold text-lg rounded-xl shadow-lg hover:bg-green-700 transition duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+              className="w-full py-3 mt-4 bg-blue-500 text-white font-extrabold text-lg rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <>
