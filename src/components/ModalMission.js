@@ -136,7 +136,10 @@ export default function ModalMission({ mission, onClose, refreshMissions }) {
     setIsUpdating(true);
     const { error } = await supabase
       .from("missions")
-      .update({ statut: "terminee" })
+      .update({ 
+        statut: "terminee",
+        date_fin: new Date() // <-- enregistrer la date et l'heure de fin
+      })
       .eq("id_uuid", mission.id_uuid);
     setIsUpdating(false);
 
@@ -149,6 +152,30 @@ export default function ModalMission({ mission, onClose, refreshMissions }) {
   }, [mission, isMissionEnCours, refreshMissions, onClose, toggleGpsTracking]);
 
   if (!mission) return null;
+
+  // --- Formatage date départ ---
+  const formattedDateDepart = mission.date_depart
+    ? new Date(mission.date_depart).toLocaleString("fr-FR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Non défini";
+
+  // --- Formatage date fin ---
+  const formattedDateFin = mission.date_fin
+    ? new Date(mission.date_fin).toLocaleString("fr-FR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <>
@@ -202,6 +229,22 @@ export default function ModalMission({ mission, onClose, refreshMissions }) {
                     Remorque: {mission.remorque_id || "N/A"}
                   </span>
                 </div>
+                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-md border border-gray-200">
+                  <CalendarDays size={18} className="text-gray-600" />
+                  <span className="font-medium text-sm">
+                    Départ prévu: {formattedDateDepart}
+                  </span>
+                </div>
+
+                {/* Afficher uniquement si mission terminée */}
+                {isMissionTerminee && formattedDateFin && (
+                  <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-md border border-gray-200">
+                    <CalendarDays size={18} className="text-gray-600" />
+                    <span className="font-medium text-sm">
+                      Terminé le: {formattedDateFin}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

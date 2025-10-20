@@ -26,8 +26,14 @@ export default function MissionModal({
   camions
 }) {
   const { toast } = useToast();
-
   const [remorquesDispo, setRemorquesDispo] = useState([]);
+
+  // ✅ NOUVEAU : état local pour la date de départ
+  const [dateDepart, setDateDepart] = useState(
+    editingMission?.date_depart
+      ? new Date(editingMission.date_depart).toISOString().slice(0, 16)
+      : ""
+  );
 
   // Mettre à jour la liste des remorques disponibles lorsque le camion change
   useEffect(() => {
@@ -60,6 +66,7 @@ export default function MissionModal({
       camion_id: camionId,
       remorque_id: remorqueId || null,
       statut: editingMission?.statut || "a_venir",
+      date_depart: dateDepart || null, // ✅ Ajout date/heure départ
     };
 
     try {
@@ -115,6 +122,16 @@ export default function MissionModal({
               type="text"
               value={depart}
               onChange={e => setDepart(e.target.value)}
+              className="w-full border rounded px-2 py-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Date et heure de départ*</label>
+            <input
+              type="datetime-local"
+              value={dateDepart}
+              onChange={e => setDateDepart(e.target.value)}
               className="w-full border rounded px-2 py-1"
             />
           </div>
